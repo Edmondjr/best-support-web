@@ -1,6 +1,6 @@
 {
-  "build": 16,
-  "version": "0.9.1 bêta",
+  "build": 17,
+  "version": "0.9.2 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Les appels WhatsApp comptent aussi : contact noté et note après l'appel."
+  "notes": "Correction de l'installation sur certains téléphones."
 }

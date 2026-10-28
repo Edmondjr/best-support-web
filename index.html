@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.9.1 bêta';
+var VERSION = '0.9.2 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -786,15 +786,15 @@ function checkExact() {
 }
 
 /* Contact automatique via le journal d'appels */
-var WA_OK = null;
+var WA_OK = null, WA_SUPPORTED = false; // désactivé : la sécurité Android bloque l'installation hors Play Store avec cette autorisation
 function checkWa() {
-  if (!N || !N.CallNotes || !N.CallNotes.waAccess) return Promise.resolve(false);
+  if (!WA_SUPPORTED || !N || !N.CallNotes) return Promise.resolve(false);
   return N.CallNotes.waAccess().then(function (r) { var was = WA_OK; WA_OK = !!(r && r.granted); if (was !== WA_OK) render(); return WA_OK; }).catch(function () { return false; });
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
 function syncWaCalls() {
-  if (!N || !N.CallNotes || !N.CallNotes.consumeWaCalls) return;
+  if (!WA_SUPPORTED || !N || !N.CallNotes) return;
   N.CallNotes.consumeWaCalls().then(function (r) {
     var n = 0;
     (r && r.calls || []).forEach(function (c) {
@@ -807,7 +807,7 @@ function syncWaCalls() {
   }).catch(function () { });
 }
 function waBlock(compact) {
-  if (!N || !N.CallNotes || !N.CallNotes.waAccess) return '';
+  if (!WA_SUPPORTED || !N || !N.CallNotes) return '';
   if (WA_OK) return compact ? '' : '<div class="row between" style="min-height:48px"><span style="font-weight:600">Appels WhatsApp</span><span class="small" style="color:var(--green-ink);font-weight:700">' + ic('check', 16) + ' Pris en compte</span></div>';
   var txt = 'WhatsApp n\'inscrit pas ses appels dans le journal du téléphone. Autorisez Best Support à voir uniquement la notification « appel en cours » de WhatsApp (le nom et la durée), jamais vos messages.';
   if (compact) return '<div class="note">' + ic('phone', 18) + '<span class="grow">Vos appels WhatsApp peuvent aussi compter : contact noté et note après l\'appel.</span><button type="button" class="btn-link" style="min-height:24px" data-act="waAllow">Autoriser</button><button type="button" class="iconbtn" style="width:32px;height:32px;min-height:32px" data-act="waHide" aria-label="Masquer">' + ic('x', 14) + '</button></div>';
@@ -1427,7 +1427,7 @@ function V_settings() {
     switchRow('Point du matin à ' + (S.settings.morningHour || 7) + ' h', S.settings.morning !== false, 'setToggle', '', 'morning') +
     switchRow('Bilan du lundi matin', S.settings.weekly !== false, 'setToggle', '', 'weekly') +
     '<div class="field"><label for="s-mh">Heure du point du matin</label><select class="in" id="s-mh" data-f="morningHour">' + [5, 6, 7, 8, 9].map(function (x) { return '<option value="' + x + '"' + (Number(F.morningHour || S.settings.morningHour || 7) === x ? ' selected' : '') + '>' + x + ' h</option>'; }).join('') + '</select></div>' + '</section>';
-  if (N) h += '<section class="card"><h2 class="h2">Contact noté automatiquement</h2><p class="small muted">Quand vous appelez un proche (appel décroché, téléphone ou WhatsApp), son dernier contact se met à jour tout seul. Rien ne quitte votre téléphone.</p>' +
+  if (N) h += '<section class="card"><h2 class="h2">Contact noté automatiquement</h2><p class="small muted">Quand vous appelez un proche (appel décroché), son dernier contact se met à jour tout seul. Rien ne quitte votre téléphone.</p>' +
     switchRow('Utiliser mon journal d\'appels', !!S.settings.callSync, 'callSyncToggle', '', 'callSync') +
     switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') + waBlock(false) +
     (S.settings.callSync ? '<button type="button" class="btn btn-ghost" data-act="syncCallsNow">Vérifier maintenant</button>' : '') + '</section>';
@@ -2492,7 +2492,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
-  { v: '0.9.1 bêta', items: ['Appels WhatsApp pris en compte : contact noté et note après l\'appel, après une autorisation unique'] },
+  { v: '0.9.2 bêta', items: ['Correction : l\'installation était bloquée par la sécurité de certains téléphones'] },
   { v: '0.9 bêta', items: ['Notifications plus utiles : « C\'est fait », « Demain » et « Appeler » directement', 'Point du matin : touchez « Écouter » pour l\'entendre', 'Relances polies sur WhatsApp, au tutoiement ou au vouvoiement selon la personne, et rappel de cotisation pour le groupe', 'Parlez à Best Support : « Qu\'est-ce que je dois faire cette semaine ? », « La dette de Koffi est payée »', 'Anniversaires : alerte 3 jours avant pour vos proches, avec le souvenir du dernier don', 'Vœux prêts pour Noël, le Nouvel An, Pâques, Tabaski et Korité', 'Widget : vos 3 priorités et un bouton micro', 'Bilan sur 7 ou 30 jours, et rappel mensuel de ceux qui attendent de vos nouvelles'] },
   { v: '0.8.2 bêta', items: ['Transcription en mode Automatique : Best Support choisit le modèle le plus précis que votre téléphone peut faire tourner rapidement'] },
   { v: '0.8.1 bêta', items: ['Note après appel activée d\'office (désactivable dans Paramètres), dès 2 secondes d\'appel avec un proche', 'Lecture à voix haute : la meilleure voix française de votre téléphone, dates, heures et montants bien prononcés', 'Choix de la voix et de la vitesse, avec un exemple à écouter', 'Transcription « Précis » par défaut, accélérée par la carte graphique quand le téléphone le permet'] },
