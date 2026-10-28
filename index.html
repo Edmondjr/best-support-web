@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.6 bêta';
+var VERSION = '0.7 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -338,14 +338,14 @@ function defaultRoutine() {
   return { id: 'culte', title: 'Culte du dimanche', day: 0, time: '09:00', on: true, checklist: ['Tenue repassée', 'Bible', 'Offrande', 'Transport prévu'] };
 }
 function fresh() {
-  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
+  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
 }
 function load() {
   try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); var f = fresh(); for (var k in f) if (s[k] == null) s[k] = f[k]; for (var k2 in f.settings) if (s.settings[k2] == null) s.settings[k2] = f.settings[k2]; (s.people || []).forEach(function (p) { if (!p.phones) p.phones = p.phone ? [{ n: p.phone, label: 'appel' }] : []; }); return s; } } catch (e) { }
   return fresh();
 }
 var S = load();
-function save() { try { stampChanges(); } catch (e) { } try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } scheduleSoon(); syncSoon(); }
+function save() { try { stampChanges(); if (sbUser) stampGroups(); } catch (e) { } try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } scheduleSoon(); syncSoon(); }
 function applyTheme() { try { document.documentElement.style.setProperty('--zoom', String(Number(S.settings.zoom) || 1)); } catch (e) { } if (S.settings.theme) document.documentElement.setAttribute('data-theme', S.settings.theme); else document.documentElement.removeAttribute('data-theme'); }
 applyTheme();
 
@@ -407,7 +407,12 @@ function roundDate(t, k) { return t.freq === 'hebdo' ? addDays(t.start, 7 * k) :
 function currentRound(t) { var td = today(); for (var k = 0; k < t.members.length * 6; k++) if (diff(td, roundDate(t, k)) >= 0) return k; return 0; }
 function receiver(t, k) { return t.members[k % t.members.length] || { name: '?' }; }
 function paidList(t, k) { return (t.paid && t.paid[k]) || []; }
-function iPaid(t, k) { return t.meIndex >= 0 && paidList(t, k).indexOf(t.meIndex) >= 0; }
+function myIdx(t) {
+  var list = t.members || t.participants || [];
+  if (sbUser) for (var i = 0; i < list.length; i++) if (list[i].uid === sbUser.id) return i;
+  return t.meIndex == null ? -1 : Number(t.meIndex);
+}
+function iPaid(t, k) { var me = myIdx(t); return me >= 0 && paidList(t, k).indexOf(me) >= 0; }
 function setPaid(t, k, idx, on) { t.paid = t.paid || {}; var arr = t.paid[k] || (t.paid[k] = []); var at = arr.indexOf(idx); if (on && at < 0) arr.push(idx); if (!on && at >= 0) arr.splice(at, 1); }
 
 /* Registre des dons */
@@ -494,13 +499,21 @@ function priorities() {
     out.push({ key: key, kind: 'item', it: it, score: r.score, U: r.U, title: it.title, sub: itemReason(it, r.d), icon: TYPES[it.type].icon });
   });
   (S.tontines || []).forEach(function (t) {
-    if (!t.on || t.meIndex < 0 || !t.members.length) return;
+    if (!t.on || myIdx(t) < 0 || !t.members.length) return;
     var k = currentRound(t), d = diff(today(), roundDate(t, k));
     if (k > 0 && !iPaid(t, k - 1) && diff(today(), roundDate(t, k - 1)) >= -14) { k = k - 1; d = diff(today(), roundDate(t, k)); }
     if (d > 7 || iPaid(t, k)) return;
     var key = 't:' + t.id + ':' + k; if (snoozed(key)) return;
     var U = urg(d);
     out.push({ key: key, kind: 'tontine', t: t, score: Math.round(0.45 * U + 21 + (d < 0 ? 25 : 0)), U: U, title: 'Cotiser : tontine ' + t.name, sub: money(t.amount) + ' · ' + whenTxt(d) + ' · tour de ' + receiver(t, k).name, icon: 'coins' });
+  });
+  (S.cotis || []).forEach(function (c) {
+    var me = myIdx(c); if (me < 0 || !c.date || !c.amount || !c.participants[me]) return;
+    if ((Number(c.participants[me].paid) || 0) >= Number(c.amount)) return;
+    var d = diff(today(), c.date); if (d > 7 || d < -3) return;
+    var key = 'c:' + c.id; if (snoozed(key)) return;
+    var U = urg(d);
+    out.push({ key: key, kind: 'coti', c: c, score: Math.round(0.45 * U + 24), U: U, title: 'Cotiser : ' + c.name, sub: money(c.amount) + ' · ' + whenTxt(d), icon: 'heart' });
   });
   var list = out.filter(function (e) { return e.score >= 40 || e.U >= 70; }).sort(function (a, b) { return b.score - a.score; });
   var rest = isRestDay();
@@ -542,6 +555,7 @@ function eventsBetween(start, end) {
     if (!tt.on || !tt.members.length) return;
     for (var k = 0; k < tt.members.length * 12; k++) { var rd = roundDate(tt, k); if (diff(rd, end) < 0) break; if (inRange(rd)) out.push({ date: rd, label: 'Tontine ' + tt.name + ' · tour de ' + receiver(tt, k).name, kind: 'coins', go: ['tontine', { id: tt.id }], extra: money(tt.amount) }); }
   });
+  (S.cotis || []).forEach(function (c) { if (c.date && inRange(c.date)) out.push({ date: c.date, label: c.name + ' (cotisation)', kind: 'heart', go: ['coti', { id: c.id }], extra: money(cotiSum(c)) }); });
   for (var yy = y0; yy <= y1; yy++) holidays(yy).forEach(function (h) { if (inRange(h.date)) out.push({ date: h.date, label: h.label, kind: 'star', tag: h.tag }); });
   return out.sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
 }
@@ -656,7 +670,7 @@ function buildSchedule() {
     S.routines.forEach(function (r) { if (r.on && Number(r.day) === dow) add('r:' + r.id + ':' + tm, atTime(d, eve), 'Demain : ' + r.title, 'Préparez : ' + r.checklist.join(', '), null, true); });
     (S.tontines || []).forEach(function (t) {
       if (!t.on || !t.members.length) return;
-      for (var k = 0; k < t.members.length * 6; k++) { var rd = roundDate(t, k); if (rd === tm) add('t:' + t.id + ':' + k, atTime(d, eve), 'Demain : tontine ' + t.name, money(t.amount) + ' · tour de ' + receiver(t, k).name, t.meIndex >= 0 ? 't:' + t.id + ':' + k : null, false); if (diff(rd, tm) < 0) break; }
+      for (var k = 0; k < t.members.length * 6; k++) { var rd = roundDate(t, k); if (rd === tm) add('t:' + t.id + ':' + k, atTime(d, eve), 'Demain : tontine ' + t.name, money(t.amount) + ' · tour de ' + receiver(t, k).name, myIdx(t) >= 0 ? 't:' + t.id + ':' + k : null, false); if (diff(rd, tm) < 0) break; }
     });
     if (S.settings.morning !== false && !restOf(d)) {
       NOW_OVERRIDE = d; var pr = priorities(); NOW_OVERRIDE = null;
@@ -793,7 +807,7 @@ function loadDemo() {
 function clearDemo() { S.people = []; S.items = []; S.contacts = []; S.tontines = []; S.gifts = []; S.checks = {}; S.snooze = {}; S.demo = false; }
 
 /* ---------- Navigation ---------- */
-var TAB_OF = { search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
+var TAB_OF = { cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
 function go(name, p, replace) {
   if (!replace) stack.push(view);
   view = { name: name, p: p || {} }; ui = {};
@@ -949,6 +963,7 @@ function whyText(e) {
     if (s.R >= 100) parts.push('et vous n\'avez pas eu de nouvelles depuis ' + s.since + ' jours (rythme souhaité : ' + s.rhythm + ' j)');
     return parts.join(', ') + '.';
   }
+  if (e.kind === 'coti') return 'Votre cotisation de ' + money(e.c.amount) + ' pour « ' + e.c.name + ' » n\'est pas encore notée.';
   if (e.kind === 'tontine') return 'Votre cotisation de ' + money(e.t.amount) + ' pour la tontine ' + e.t.name + ' n\'est pas encore notée.';
   var d = diff(today(), e.it.due);
   return d < 0 ? 'Cette échéance est dépassée de ' + (-d) + ' jour' + (-d > 1 ? 's' : '') + '.' : d === 0 ? 'L\'échéance est aujourd\'hui.' : 'L\'échéance approche : ' + whenTxt(d) + '.';
@@ -1195,7 +1210,7 @@ function V_personForm(p0) {
 }
 
 function V_plus() {
-  var rows = [['bilan', 'chart', 'Bilan de la semaine', 'Votre semaine en quelques mots'], ['tontines', 'coins', 'Tontines', 'Cotisations, tours et rappels'], ['gifts', 'heart', 'Registre des dons', 'Ce que vous avez reçu et donné'], ['routines', 'shirt', 'Routines de veille', 'Préparer le dimanche et les cérémonies'], ['importContacts', 'users', 'Ajouter mes contacts', 'Répertoire du téléphone ou fichier .vcf'], ['calendars', 'calendar', 'Mon agenda Google', 'Importer vos évènements'], ['news', 'sparkle', 'Nouveautés', 'Ce qui a changé'], ['report', 'flag', 'Signaler un problème ou une idée', 'Aidez-nous à améliorer l\'app'], ['about', 'info', 'À propos et testeurs', 'Une initiative #MrDNEJ, vos suggestions'], ['settings', 'gear', 'Paramètres', 'Prénom, repos, rappels, sauvegarde']];
+  var rows = [['bilan', 'chart', 'Bilan de la semaine', 'Votre semaine en quelques mots'], ['tontines', 'coins', 'Tontines', 'Cotisations, tours et rappels'], ['cotis', 'heart', 'Cotisations', 'Mariages, funérailles, baptêmes : qui a cotisé'], ['join', 'users', 'Rejoindre un groupe', 'Avec le code reçu d\'un proche'], ['gifts', 'star', 'Registre des dons', 'Ce que vous avez reçu et donné'], ['routines', 'shirt', 'Routines de veille', 'Préparer le dimanche et les cérémonies'], ['importContacts', 'users', 'Ajouter mes contacts', 'Répertoire du téléphone ou fichier .vcf'], ['calendars', 'calendar', 'Mon agenda Google', 'Importer vos évènements'], ['news', 'sparkle', 'Nouveautés', 'Ce qui a changé'], ['report', 'flag', 'Signaler un problème ou une idée', 'Aidez-nous à améliorer l\'app'], ['about', 'info', 'À propos et testeurs', 'Une initiative #MrDNEJ, vos suggestions'], ['settings', 'gear', 'Paramètres', 'Prénom, repos, rappels, sauvegarde']];
   var h = '<div class="screen"><h1 class="h1">Plus</h1><div class="list">' + rows.map(function (r) { return '<button type="button" class="li" data-act="go" data-to="' + r[0] + '"><span class="av">' + ic(r[1]) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + r[2] + '</span><span class="sub">' + r[3] + '</span></span>' + ic('chev', 18) + '</button>'; }).join('') + '</div>';
   h += accountCard() + installCard() + notifCard();
   return h + '</div>';
@@ -1292,6 +1307,7 @@ function V_about() {
   }
   h += '</section>';
   h += '<section class="card"><h2 class="h2">Nouveautés</h2><div class="stack small"><p><b>Version ' + VERSION + '</b></p><p>Application Android : rappels même app fermée et sans internet, avec « C\'est fait » et « Demain » dans la notification. Point du matin et bilan du lundi. Import des contacts du téléphone. Contact noté automatiquement après un appel. Messages prêts pour WhatsApp. Remboursements partiels. Verrouillage par code ou empreinte. Tontines. Registre des dons. Engagements récurrents.</p><p><b>Version 0.1</b></p><p>Score de priorité expliqué, proches et cercles, engagements et dettes, routines de veille, bilan de la semaine, export agenda, jour de repos.</p><p class="muted">Prochainement : widget d\'écran d\'accueil, sauvegarde Google Drive, saisie à la voix.</p></div></section>';
+  h += '<p class="tiny muted" style="text-align:center"><a href="https://bestsupport.mrdnej.com/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a> · <a href="https://bestsupport.mrdnej.com/conditions.html" target="_blank" rel="noopener">Conditions d\'utilisation</a></p>';
   h += '<p class="tiny muted" style="text-align:center">Version ' + VERSION + ' · Conçue avec l\'aide de Claude</p>';
   return h + '</div>';
 }
@@ -1398,34 +1414,36 @@ function V_tontines() {
       '<button type="button" class="switch" role="switch" aria-checked="' + !!t.on + '" aria-label="Activer ' + esc(t.name) + '" data-act="toggleTontine" data-id="' + t.id + '"></button></div>';
   }).join('') + '</div>';
   h += '<button type="button" class="btn btn-dark btn-block" data-act="go" data-to="tontineForm">' + ic('plus', 18) + ' Nouvelle tontine</button>';
+  h += '<button type="button" class="btn btn-ghost btn-block" data-act="go" data-to="join">' + ic('users', 18) + ' Rejoindre avec un code</button>';
   return h + '</div>';
 }
 function V_tontine(p0) {
   var t = tontine(p0.id); if (!t) return V_missing();
   var n = t.members.length, k = ui.k != null && ui.k !== '' ? Number(ui.k) : (p0.k != null ? Number(p0.k) : currentRound(t));
-  var rcv = receiver(t, k), pl = paidList(t, k), meRcv = (k % n) === t.meIndex;
+  var rcv = receiver(t, k), pl = paidList(t, k), meIx = myIdx(t), meRcv = (k % n) === meIx;
   var h = '<div class="band"><div class="top"><button type="button" class="iconbtn" data-act="back" aria-label="Retour">' + ic('back') + '</button>' +
     '<button type="button" class="iconbtn" data-act="go" data-to="tontineForm" data-id="' + t.id + '" aria-label="Modifier">' + ic('edit') + '</button></div>' +
     '<div class="bic">' + ic('coins', 30) + '</div><h1>' + esc(t.name) + '</h1><p>' + esc(money(t.amount) + ' · ' + (t.freq === 'hebdo' ? 'chaque semaine' : 'chaque mois') + ' · ' + plural(n, 'membre')) + '</p></div>';
-  h += '<div class="screen lift"><section class="card"><div class="row between"><button type="button" class="iconbtn" data-act="tRound" data-k="' + (k - 1) + '" aria-label="Tour précédent"' + (k <= 0 ? ' disabled' : '') + '>' + ic('back') + '</button>' +
+  h += '<div class="screen lift">' + whoAmICard(t, 'tontine') + '<section class="card"><div class="row between"><button type="button" class="iconbtn" data-act="tRound" data-k="' + (k - 1) + '" aria-label="Tour précédent"' + (k <= 0 ? ' disabled' : '') + '>' + ic('back') + '</button>' +
     '<div class="stack" style="gap:2px;align-items:center;text-align:center"><span class="eyebrow muted">Tour ' + (k + 1) + '</span><span class="h2">' + esc(fmtLong(roundDate(t, k))) + '</span><span class="small muted">' + esc(rel(roundDate(t, k))) + '</span></div>' +
     '<button type="button" class="iconbtn" data-act="tRound" data-k="' + (k + 1) + '" aria-label="Tour suivant">' + ic('chev') + '</button></div>' +
     '<div class="note' + (meRcv ? ' o' : '') + '">' + ic('star', 18) + '<span>' + (meRcv ? 'C\'est votre tour : vous recevez la cagnotte de ' + money(t.amount * n) + '.' : 'C\'est le tour de ' + esc(rcv.name) + ' : cagnotte de ' + money(t.amount * n) + '.') + '</span></div>' +
     '<div class="bar"><i style="width:' + Math.max(2, Math.round(pl.length / n * 100)) + '%;background:var(--green-2)"></i></div><p class="small" style="font-weight:700">' + pl.length + ' sur ' + n + ' ont cotisé</p></section>';
   h += '<section class="stack"><h2 class="h2">Cotisations de ce tour</h2><div class="list">' + t.members.map(function (m, ix) {
     var on = pl.indexOf(ix) >= 0;
-    return '<div class="li"><button type="button" class="tick" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(m.name) + ' a cotisé" data-act="tPaid" data-id="' + t.id + '" data-k="' + k + '" data-ix="' + ix + '">' + ic('check', 16) + '</button><span class="grow ttl">' + esc(m.name) + (ix === t.meIndex ? ' (vous)' : '') + '</span>' + ((k % n) === ix ? '<span class="badge b-hi">Reçoit</span>' : '') + '</div>';
+    return '<div class="li"><button type="button" class="tick" role="checkbox" aria-checked="' + on + '" aria-label="' + esc(m.name) + ' a cotisé" data-act="tPaid" data-id="' + t.id + '" data-k="' + k + '" data-ix="' + ix + '">' + ic('check', 16) + '</button><span class="grow ttl">' + esc(m.name) + (ix === meIx ? ' (vous)' : '') + '</span>' + ((k % n) === ix ? '<span class="badge b-hi">Reçoit</span>' : '') + '</div>';
   }).join('') + '</div></section>';
   h += '<section class="stack"><h2 class="h2">Ordre de passage</h2><div class="list">' + t.members.map(function (m, ix) {
     var kk = Math.floor(k / n) * n + ix;
-    return '<div class="li" style="min-height:52px"><span class="tiny" style="flex:none;width:70px;font-weight:800;color:var(--orange-ink);text-transform:uppercase">' + esc(fmt(roundDate(t, kk))) + '</span><span class="grow ttl" style="font-size:14px">' + esc(m.name) + (ix === t.meIndex ? ' (vous)' : '') + '</span></div>';
+    return '<div class="li" style="min-height:52px"><span class="tiny" style="flex:none;width:70px;font-weight:800;color:var(--orange-ink);text-transform:uppercase">' + esc(fmt(roundDate(t, kk))) + '</span><span class="grow ttl" style="font-size:14px">' + esc(m.name) + (ix === meIx ? ' (vous)' : '') + '</span></div>';
   }).join('') + '</div></section>';
+  h += shareCard(t, 'tontine');
   h += confirmBlock('delt', 'Supprimer la tontine', 'Supprimer la tontine « ' + t.name + ' » ?', 'delTontine', t.id);
   return h + '</div>';
 }
 function V_tontineForm(p0) {
   var t = p0.id ? tontine(p0.id) : null;
-  if (!F._init) F = t ? { _init: 1, name: t.name, amount: t.amount, freq: t.freq, start: t.start, membersTxt: t.members.map(function (m, i) { return i === t.meIndex ? 'Moi' : m.name; }).join('\n') } : { _init: 1, name: '', amount: '', freq: 'mensuel', start: addDays(today(), 3), membersTxt: '' };
+  if (!F._init) F = t ? { _init: 1, name: t.name, amount: t.amount, freq: t.freq, start: t.start, membersTxt: t.members.map(function (m, i) { return i === myIdx(t) ? 'Moi' : m.name; }).join('\n') } : { _init: 1, name: '', amount: '', freq: 'mensuel', start: addDays(today(), 3), membersTxt: '' };
   var h = '<div class="screen nonav"><div class="row between"><button type="button" class="iconbtn" data-act="back" aria-label="Fermer">' + ic('x') + '</button><h1 class="h2">' + (t ? 'Modifier la tontine' : 'Nouvelle tontine') + '</h1><span style="width:44px"></span></div>';
   h += '<form class="stack" style="gap:14px" data-form="tontine" novalidate>';
   h += '<div class="field"><label for="t-tname">Nom</label><input class="in" id="t-tname" data-f="name" value="' + esc(F.name) + '" placeholder="Ex. Tontine du quartier"></div>';
@@ -1732,7 +1750,7 @@ function searchResults() {
 
 /* Compte Google et synchronisation entre appareils */
 var sb = null, sbUser = null, syncBusy = false, syncErr = '', syncTimer = null;
-var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts'];
+var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts', 'cotis'];
 var LOCAL_SETTINGS = ['lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
 function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h; }
 function syncRecords() {
@@ -1794,6 +1812,9 @@ function syncNow(manual) {
   }).then(function (res) {
     if (res.error) throw res.error;
     (res.data || []).forEach(function (row) { if (applyRow(row)) changed++; if (!Y.pulledAt || row.server_at > Y.pulledAt) Y.pulledAt = row.server_at; });
+    return syncGroups().then(function (gn) { changed += gn; }).catch(function (e) { console.warn('groupes', e); });
+  }).then(function () {
+    var Y = S.sync;
     Y.at = Date.now(); syncBusy = false;
     try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
     if (changed) { applyTheme(); scheduleSoon(); }
@@ -1801,6 +1822,157 @@ function syncNow(manual) {
     if (manual) toast(changed ? plural(changed, 'élément reçu') + ' de vos autres appareils.' : 'Tout est synchronisé.');
   }).catch(function (e) { syncBusy = false; syncErr = errMsg(e); if (manual) toast('Synchronisation impossible pour le moment. (' + syncErr + ')'); if (view.name === 'settings') render(); });
 }
+/* Mode famille : tontines et cotisations partagées entre comptes */
+function sharedList() { return (S.tontines || []).filter(function (t) { return t.gid; }).map(function (t) { return { o: t, kind: 'tontine' }; }).concat((S.cotis || []).filter(function (c) { return c.gid; }).map(function (c) { return { o: c, kind: 'cotisation' }; })); }
+function groupPayload(o, kind) {
+  return kind === 'tontine' ? { amount: o.amount, freq: o.freq, start: o.start, members: o.members, paid: o.paid || {} }
+    : { date: o.date, amount: o.amount, target: o.target, participants: o.participants, notes: o.notes || '' };
+}
+function stampGroups() {
+  var gh = S.ghash || (S.ghash = {}), gd = S.gdirty || (S.gdirty = {}), now = Date.now();
+  sharedList().forEach(function (x) { var hv = hashStr(x.o.name + JSON.stringify(groupPayload(x.o, x.kind))); if (gh[x.o.gid] !== hv) { gh[x.o.gid] = hv; x.o.gAt = now; gd[x.o.gid] = now; } });
+}
+function applyGroupRow(row) {
+  var arr = row.kind === 'tontine' ? S.tontines : (S.cotis || (S.cotis = []));
+  var o = arr.filter(function (x) { return x.gid === row.id; })[0], isNew = !o;
+  if (o && Number(row.updated_at) <= (o.gAt || 0)) return false;
+  if (!o) { o = { id: uid(), gid: row.id, on: true, meIndex: -1 }; arr.push(o); }
+  o.gcode = row.code; o.name = row.name; o.gAt = Number(row.updated_at);
+  var d = row.data || {};
+  if (row.kind === 'tontine') { o.amount = d.amount; o.freq = d.freq || 'mensuel'; o.start = d.start || today(); o.members = d.members || []; o.paid = d.paid || {}; }
+  else { o.date = d.date || ''; o.amount = d.amount || ''; o.target = d.target || ''; o.participants = d.participants || []; o.notes = d.notes || ''; }
+  S.ghash = S.ghash || {}; S.ghash[row.id] = hashStr(o.name + JSON.stringify(groupPayload(o, row.kind)));
+  if (S.gdirty) delete S.gdirty[row.id];
+  return isNew ? 'new' : true;
+}
+function syncGroups() {
+  if (!sb || !sbUser) return Promise.resolve(0);
+  stampGroups();
+  var gd = S.gdirty || {}, list = sharedList().filter(function (x) { return gd[x.o.gid]; });
+  var pushes = list.map(function (x) {
+    var at = gd[x.o.gid];
+    return sb.rpc('push_group', { p_id: x.o.gid, p_name: x.o.name, p_data: groupPayload(x.o, x.kind), p_updated_at: x.o.gAt || at }).then(function (r) { if (!r.error && gd[x.o.gid] === at) delete gd[x.o.gid]; });
+  });
+  return Promise.all(pushes).then(function () {
+    return sb.from('groups').select('id,code,kind,name,data,updated_at');
+  }).then(function (res) {
+    if (res.error) throw res.error;
+    var n = 0, ids = {};
+    (res.data || []).forEach(function (row) { ids[row.id] = 1; if (applyGroupRow(row)) n++; });
+    sharedList().forEach(function (x) { if (!ids[x.o.gid] && !gd[x.o.gid]) { x.o.gLost = true; } else x.o.gLost = false; });
+    return n;
+  });
+}
+function shareGroup(o, kind) {
+  if (!sbUser) { toast('Connectez-vous avec Google (Plus) pour partager.'); return; }
+  o.gAt = Date.now();
+  if (kind === 'tontine' && myIdx(o) >= 0 && o.members[myIdx(o)]) o.members[myIdx(o)].uid = sbUser.id;
+  if (kind === 'cotisation' && myIdx(o) >= 0 && o.participants[myIdx(o)]) o.participants[myIdx(o)].uid = sbUser.id;
+  sb.rpc('create_group', { p_kind: kind, p_name: o.name, p_data: groupPayload(o, kind), p_updated_at: o.gAt, p_display_name: S.settings.name || sbUser.email || '' }).then(function (r) {
+    if (r.error) throw r.error;
+    var row = Array.isArray(r.data) ? r.data[0] : r.data;
+    o.gid = row.id; o.gcode = row.code; S.ghash = S.ghash || {}; S.ghash[o.gid] = hashStr(o.name + JSON.stringify(groupPayload(o, kind)));
+    save(); render(); toast('Partagé. Code : ' + o.gcode);
+  }).catch(function (e) { toast('Partage impossible pour le moment. (' + errMsg(e) + ')'); });
+}
+function joinGroup(code) {
+  if (!sbUser) { toast('Connectez-vous avec Google (Plus) pour rejoindre un groupe.'); return; }
+  var c = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length !== 6) { ui.err = 'Le code contient 6 lettres ou chiffres.'; render(); return; }
+  sb.rpc('join_group', { p_code: c, p_display_name: S.settings.name || sbUser.email || '' }).then(function (r) {
+    if (r.error) throw r.error;
+    var row = Array.isArray(r.data) ? r.data[0] : r.data;
+    var ex = (row.kind === 'tontine' ? S.tontines : (S.cotis || [])).filter(function (x) { return x.gid === row.id; })[0];
+    if (ex) ex.gAt = 0;
+    applyGroupRow(row); save();
+    var o = (row.kind === 'tontine' ? S.tontines : S.cotis).filter(function (x) { return x.gid === row.id; })[0];
+    F = {}; stack = [{ name: 'plus', p: {} }]; view = { name: row.kind === 'tontine' ? 'tontine' : 'coti', p: { id: o.id, whoami: 1 } }; ui = {}; render(); window.scrollTo(0, 0);
+    toast('Vous avez rejoint « ' + row.name + ' ».');
+  }).catch(function (e) { var m = errMsg(e); ui.err = /inconnu/.test(m) ? 'Ce code ne correspond à aucun groupe. Vérifiez-le.' : 'Impossible de rejoindre pour le moment. (' + m + ')'; render(); });
+}
+function leaveGroup(o) {
+  if (!sb || !sbUser || !o.gid) return;
+  sb.from('group_members').delete().eq('group_id', o.gid).eq('user_id', sbUser.id).then(function () {
+    delete o.gid; delete o.gcode; delete o.gAt; save(); render(); toast('Ce groupe n\'est plus partagé avec vous. Votre copie reste sur vos appareils.');
+  });
+}
+function whoAmICard(o, kind) {
+  var list = kind === 'tontine' ? o.members : o.participants;
+  if (!o.gid || !sbUser || myIdx(o) >= 0) return '';
+  return '<section class="card" style="border:1.5px solid var(--orange)"><h2 class="h2">Qui êtes-vous dans ce groupe ?</h2><p class="small muted">Choisissez votre nom : l\'app saura quand c\'est à vous de cotiser.</p><div class="chips" style="flex-wrap:wrap">' +
+    list.map(function (m, i) { return m.uid ? '' : '<button type="button" class="chip" data-act="iAm" data-kind="' + kind + '" data-id="' + o.id + '" data-ix="' + i + '">' + esc(m.name) + '</button>'; }).join('') +
+    (kind === 'cotisation' ? '<button type="button" class="chip" data-act="iAm" data-kind="' + kind + '" data-id="' + o.id + '" data-ix="new">+ M\'ajouter</button>' : '') + '</div></section>';
+}
+function shareCard(o, kind) {
+  var label = kind === 'tontine' ? 'cette tontine' : 'cette cotisation';
+  if (!o.gid) return '<section class="card"><div class="row"><span class="av">' + ic('users') + '</span><div class="grow"><h2 class="h2">Partager avec la famille</h2><p class="small muted">Chaque membre voit les mêmes informations et qui a payé, sur son propre téléphone.</p></div></div>' +
+    (sbUser ? '<button type="button" class="btn btn-dark btn-block" data-act="shareGroup" data-kind="' + kind + '" data-id="' + o.id + '">' + ic('share', 18) + ' Partager ' + label + '</button>' : '<p class="small">Connectez-vous avec Google dans Plus pour partager.</p>') + '</section>';
+  var msg = 'Rejoins « ' + o.name + ' » sur Best Support : ouvre l\'app, Plus, « Rejoindre un groupe », et tape le code ' + o.gcode + '. Pas encore l\'app ? https://bestsupport.mrdnej.com';
+  return '<section class="card"><div class="row between"><div><h2 class="h2">Partagé en famille</h2><p class="small muted">Code à donner aux membres</p></div><span class="money" style="font-size:26px;letter-spacing:3px;color:var(--orange-ink);user-select:all">' + esc(o.gcode || '') + '</span></div>' +
+    (o.gLost ? '<p class="small" style="color:var(--hi-fg)">Ce groupe n\'est plus accessible (supprimé par son créateur ?).</p>' : '') +
+    '<div class="grid2"><a class="btn btn-green" href="' + esc('https://wa.me/?text=' + encodeURIComponent(msg)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' Inviter (WhatsApp)</a><button type="button" class="btn btn-ghost" data-act="leaveGroup" data-kind="' + kind + '" data-id="' + o.id + '">Quitter le partage</button></div>' +
+    '<p class="tiny muted">Les changements de chacun arrivent chez les autres à l\'ouverture de l\'app, quand internet est disponible.</p></section>';
+}
+
+/* Cotisations (mariage, funérailles, baptême…) */
+function coti(id) { return (S.cotis || []).filter(function (c) { return c.id === id; })[0] || null; }
+function cotiSum(c) { return (c.participants || []).reduce(function (a, x) { return a + (Number(x.paid) || 0); }, 0); }
+function V_cotis() {
+  var list = S.cotis || [];
+  var h = '<div class="screen">' + head('Cotisations');
+  h += '<p class="muted">Mariage, funérailles, baptême, dot : suivez qui a cotisé et combien, seul ou en famille.</p>';
+  h += list.length ? '<div class="list">' + list.slice().sort(function (a, b) { return (a.date || '') < (b.date || '') ? -1 : 1; }).map(function (c) {
+    var sum = cotiSum(c), tgt = Number(c.target) || 0, me = myIdx(c), mine = me >= 0 ? (Number(c.participants[me].paid) || 0) : null;
+    return '<button type="button" class="li" data-act="go" data-to="coti" data-id="' + c.id + '"><span class="av o">' + ic('heart', 18) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(c.name) + (c.gid ? ' <span class="badge b-lo">Famille</span>' : '') + '</span><span class="sub">' + esc((c.date ? fmt(c.date) + ' · ' : '') + money(sum) + (tgt ? ' sur ' + money(tgt) : '') + ' · ' + plural((c.participants || []).filter(function (x) { return Number(x.paid) > 0; }).length, 'personne') + ' a cotisé') + '</span></span>' + (mine != null && c.amount && mine < Number(c.amount) ? '<span class="badge b-hi">À payer</span>' : '') + '</button>';
+  }).join('') + '</div>' : '<section class="card empty"><div class="av lg">' + ic('heart', 28) + '</div><p class="small muted">Aucune cotisation pour l\'instant.</p></section>';
+  h += '<button type="button" class="btn btn-dark btn-block" data-act="go" data-to="cotiForm">' + ic('plus', 18) + ' Nouvelle cotisation</button>';
+  h += '<button type="button" class="btn btn-ghost btn-block" data-act="go" data-to="join">' + ic('users', 18) + ' Rejoindre avec un code</button>';
+  return h + '</div>';
+}
+function V_coti(p0) {
+  var c = coti(p0.id); if (!c) return V_missing();
+  var sum = cotiSum(c), tgt = Number(c.target) || 0, me = myIdx(c), parts = c.participants || [];
+  var h = '<div class="band"><div class="top"><button type="button" class="iconbtn" data-act="back" aria-label="Retour">' + ic('back') + '</button>' +
+    '<button type="button" class="iconbtn" data-act="go" data-to="cotiForm" data-id="' + c.id + '" aria-label="Modifier">' + ic('edit') + '</button></div>' +
+    '<div class="bic">' + ic('heart', 30) + '</div><h1>' + esc(c.name) + '</h1><p>' + esc((c.date ? fmtLong(c.date) + ' · ' : '') + (c.amount ? money(c.amount) + ' par personne' : 'Montant libre')) + '</p></div>';
+  h += '<div class="screen lift">' + whoAmICard(c, 'cotisation');
+  h += '<section class="card"><div class="row between"><h2 class="h2">Collecté</h2><span class="money" style="font-size:22px;color:var(--green-ink)">' + money(sum) + '</span></div>' +
+    (tgt ? '<div class="bar"><i style="width:' + Math.min(100, Math.max(2, Math.round(sum / tgt * 100))) + '%;background:var(--green-2)"></i></div><p class="small muted">Objectif : ' + money(tgt) + ' · reste ' + money(Math.max(0, tgt - sum)) + '</p>' : '') +
+    '<p class="small" style="font-weight:700">' + parts.filter(function (x) { return Number(x.paid) > 0; }).length + ' sur ' + parts.length + ' ont cotisé</p></section>';
+  h += '<section class="stack"><h2 class="h2">Participants</h2><div class="list">' + parts.map(function (x, i) {
+    var paid = Number(x.paid) || 0, full = c.amount ? paid >= Number(c.amount) : paid > 0;
+    if (String(ui.editP) === String(i)) return '<div class="li" style="flex-wrap:wrap"><span class="grow ttl">' + esc(x.name) + '</span><input class="in" id="cp-amt" type="number" inputmode="numeric" min="0" step="500" data-f="cpAmt" value="' + esc(F.cpAmt != null ? F.cpAmt : (paid || c.amount || '')) + '" aria-label="Montant payé par ' + esc(x.name) + '" style="width:130px;flex:none"><button type="button" class="btn btn-green" style="min-height:44px" data-act="cotiPay" data-id="' + c.id + '" data-ix="' + i + '">OK</button></div>';
+    return '<div class="li"><button type="button" class="tick" role="checkbox" aria-checked="' + full + '" aria-label="' + esc(x.name) + ' a payé" data-act="cotiTick" data-id="' + c.id + '" data-ix="' + i + '">' + ic('check', 16) + '</button>' +
+      '<button type="button" class="grow stack" style="gap:2px;background:none;border:0;text-align:left;padding:0;color:var(--fg);min-height:44px;justify-content:center" data-act="ui" data-k="editP" data-v="' + i + '"><span class="ttl">' + esc(x.name) + (i === me ? ' (vous)' : '') + '</span><span class="sub">' + (paid ? 'A donné ' + money(paid) : 'Pas encore') + ' · toucher pour modifier</span></button></div>';
+  }).join('') + '</div>' +
+    '<div class="row" style="align-items:flex-end"><div class="field grow"><label for="cp-new">Ajouter un participant</label><input class="in" id="cp-new" data-f="cpNew" value="' + esc(F.cpNew || '') + '" placeholder="Nom"></div><button type="button" class="btn btn-ghost" data-act="cotiAdd" data-id="' + c.id + '">Ajouter</button></div></section>';
+  if (c.notes) h += '<section class="card"><h2 class="h2">Notes</h2><p>' + esc(c.notes) + '</p></section>';
+  h += shareCard(c, 'cotisation');
+  h += confirmBlock('delc', 'Supprimer la cotisation', 'Supprimer « ' + c.name + ' » ' + (c.gid ? 'de vos appareils ? Les autres membres la gardent.' : '?'), 'delCoti', c.id);
+  return h + '</div>';
+}
+function V_cotiForm(p0) {
+  var c = p0.id ? coti(p0.id) : null;
+  if (!F._init) F = c ? { _init: 1, name: c.name, date: c.date, amount: c.amount, target: c.target, notes: c.notes, partsTxt: c.participants.map(function (x, i) { return i === myIdx(c) ? 'Moi' : x.name; }).join('\n') } : { _init: 1, name: '', date: addDays(today(), 14), amount: '', target: '', notes: '', partsTxt: 'Moi' };
+  var h = '<div class="screen nonav"><div class="row between"><button type="button" class="iconbtn" data-act="back" aria-label="Fermer">' + ic('x') + '</button><h1 class="h2">' + (c ? 'Modifier la cotisation' : 'Nouvelle cotisation') + '</h1><span style="width:44px"></span></div>';
+  h += '<form class="stack" style="gap:14px" data-form="coti" novalidate>';
+  h += '<div class="field"><label for="c-name">Pour quoi ?</label><input class="in" id="c-name" data-f="name" value="' + esc(F.name) + '" placeholder="Ex. Mariage de Kouamé"></div>';
+  h += '<div class="grid2"><div class="field"><label for="c-date">Date de la cérémonie</label><input class="in" id="c-date" type="date" data-f="date" value="' + esc(F.date) + '"></div><div class="field"><label for="c-amount">Par personne (FCFA)</label><input class="in" id="c-amount" type="number" inputmode="numeric" min="0" step="500" data-f="amount" value="' + esc(F.amount) + '" placeholder="Facultatif"></div></div>';
+  h += '<div class="field"><label for="c-target">Objectif total (FCFA, facultatif)</label><input class="in" id="c-target" type="number" inputmode="numeric" min="0" step="1000" data-f="target" value="' + esc(F.target) + '"></div>';
+  h += '<div class="field"><label for="c-parts">Participants (un par ligne, « Moi » pour vous)</label><textarea class="in" id="c-parts" data-f="partsTxt" style="min-height:140px">' + esc(F.partsTxt) + '</textarea></div>';
+  h += '<div class="field"><label for="c-notes">Notes</label><textarea class="in" id="c-notes" data-f="notes" placeholder="Ex. Remettre l\'enveloppe à Tonton Yao">' + esc(F.notes) + '</textarea></div>';
+  if (ui.err) h += '<p class="err" role="alert">' + esc(ui.err) + '</p>';
+  return h + '<button type="submit" class="btn btn-dark btn-block">Enregistrer</button></form></div>';
+}
+function V_join() {
+  var h = '<div class="screen">' + head('Rejoindre un groupe');
+  h += '<p class="muted">Un membre de votre famille vous a donné un code de 6 caractères pour une tontine ou une cotisation partagée.</p>';
+  if (!sbUser) return h + accountCard() + '</div>';
+  h += '<form class="stack" style="gap:12px" data-form="join" novalidate><div class="field"><label for="j-code">Code</label><input class="in" id="j-code" data-f="jcode" value="' + esc(F.jcode || '') + '" placeholder="Ex. K7P2QX" autocomplete="off" autocapitalize="characters" maxlength="8" style="font-size:22px;letter-spacing:4px;text-transform:uppercase;text-align:center"></div>' +
+    (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '') + '<button type="submit" class="btn btn-dark btn-block">Rejoindre</button></form>';
+  return h + '</div>';
+}
+
 function onLogin() {
   if (!S.settings.onboarded) { S.settings.onboarded = true; S.settings.firstUse = today(); S.settings.seenVersion = VERSION; stack = []; view = { name: 'home', p: {} }; }
   if (!S.sync || S.sync.uid !== sbUser.id) {
@@ -1917,6 +2089,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.7 bêta', items: ['Mode famille : partagez une tontine ou une cotisation avec un code, chacun voit qui a payé', 'Nouveau module Cotisations : mariages, funérailles, baptêmes, dot', 'Rejoindre un groupe avec le code reçu d\'un proche', 'Liens Confidentialité et Conditions dans À propos'] },
   { v: '0.6 bêta', items: ['Importer vos contacts Google directement', 'Les contacts déjà enregistrés ne sont plus importés en double', 'Recherche par nom ou numéro, « Tout cocher » pour l\'import en masse', 'Nouvelle icône Paramètres'] },
   { v: '0.5 bêta', items: ['Connexion avec Google : vos données sauvegardées en ligne et synchronisées entre votre téléphone et votre ordinateur', 'Chaque membre de la famille se connecte avec son propre compte Google'] },
   { v: '0.4 bêta', items: ['Widget Android : votre priorité du jour sur l\'écran d\'accueil', 'Vos retours et signalements arrivent directement à Edmond, même envoyés hors ligne'] },
@@ -1965,7 +2138,7 @@ function V_lock() {
     (N && S.settings.lock === 'bio' ? '<button type="button" class="btn btn-ghost btn-block" data-act="bio">Utiliser l\'empreinte</button>' : '') + '</form></div>';
 }
 
-var VIEWS = { search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
+var VIEWS = { cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
 function navHtml() {
   var cur = TAB_OF[view.name] || '';
   var b = function (id, icon, label) { return '<button type="button" data-act="tab" data-to="' + id + '"' + (cur === id ? ' aria-current="page"' : '') + '>' + ic(icon, 22) + label + '</button>'; };
@@ -1975,7 +2148,7 @@ function navHtml() {
 function render() {
   if (locked) { document.getElementById('app').innerHTML = V_lock(); return; }
   var fn = VIEWS[view.name] || V_home;
-  var withNav = TAB_OF[view.name] && ['itemForm', 'personForm', 'routine', 'giftForm', 'tontineForm'].indexOf(view.name) < 0;
+  var withNav = TAB_OF[view.name] && ['itemForm', 'personForm', 'routine', 'giftForm', 'tontineForm', 'cotiForm'].indexOf(view.name) < 0;
   var rb = withNav && S.settings.reportBtn !== false && S.settings.onboarded ? '<button type="button" class="reportbtn" data-act="report" aria-label="Signaler un problème ou une idée">' + ic('flag', 18) + '</button>' : '';
   document.getElementById('app').innerHTML = fn(view.p) + (withNav ? navHtml() : '') + rb;
 }
@@ -1987,6 +2160,7 @@ function openKey(key) {
   if (a[0] === 'p' && person(a[1])) go('person', { id: a[1] });
   else if (a[0] === 'i' && item(a[1])) go('item', { id: a[1] });
   else if (a[0] === 't' && tontine(a[1])) go('tontine', { id: a[1], k: a[2] });
+  else if (a[0] === 'c' && coti(a[1])) go('coti', { id: a[1] });
   else render();
 }
 function doDone(key) {
@@ -1998,7 +2172,8 @@ function doDone(key) {
     markContact(p); return "C'est noté pour " + p.name + '.';
   }
   if (a[0] === 'i') { var it = item(a[1]); if (it && !it.done) { var nx = completeItem(it); return nx ? 'Fait. Prochaine fois : ' + fmtDM(nx.due) + '.' : "C'est noté."; } return "C'est noté."; }
-  if (a[0] === 't') { var t = tontine(a[1]); if (t) { setPaid(t, Number(a[2]), t.meIndex, true); return 'Cotisation notée pour la tontine ' + t.name + '.'; } }
+  if (a[0] === 'c') { var cc = coti(a[1]); if (cc && myIdx(cc) >= 0) { cc.participants[myIdx(cc)].paid = Number(cc.amount) || 0; return 'Cotisation notée pour « ' + cc.name + ' ».'; } }
+  if (a[0] === 't') { var t = tontine(a[1]); if (t) { setPaid(t, Number(a[2]), myIdx(t), true); return 'Cotisation notée pour la tontine ' + t.name + '.'; } }
   return "C'est noté.";
 }
 var ACT = {
@@ -2046,7 +2221,7 @@ var ACT = {
   tRound: function (d) { ui.k = Math.max(0, Number(d.k)); render(); },
   tPaid: function (d, el) { var t = tontine(d.id), k = Number(d.k), idx = Number(d.ix), on = paidList(t, k).indexOf(idx) < 0; setPaid(t, k, idx, on); save(); render(); },
   toggleTontine: function (d) { var t = tontine(d.id); t.on = !t.on; save(); render(); },
-  delTontine: function (d) { var snap = snapshot(); S.tontines = S.tontines.filter(function (x) { return x.id !== d.id; }); save(); F = {}; stack = []; tab('plus'); go('tontines'); toast('Tontine supprimée.', snap); },
+  delTontine: function (d) { var snap = snapshot(), tt = tontine(d.id); if (tt && tt.gid && sb && sbUser) sb.from('group_members').delete().eq('group_id', tt.gid).eq('user_id', sbUser.id); S.tontines = S.tontines.filter(function (x) { return x.id !== d.id; }); save(); F = {}; stack = []; tab('plus'); go('tontines'); toast('Tontine supprimée.', snap); },
   delGift: function (d) { var snap = snapshot(); S.gifts = S.gifts.filter(function (x) { return x.id !== d.id; }); save(); F = {}; back(); toast('Don supprimé.', snap); },
   msgOcc: function (d) { ui.occ = d.v; render(); },
   copyMsg: function (d) {
@@ -2064,6 +2239,19 @@ var ACT = {
   },
   pickContact: function () { pickOneContact(); },
   googleContacts: function () { startGoogleContacts(); },
+  shareGroup: function (d) { var o = d.kind === 'tontine' ? tontine(d.id) : coti(d.id); if (o) shareGroup(o, d.kind); },
+  leaveGroup: function (d) { var o = d.kind === 'tontine' ? tontine(d.id) : coti(d.id); if (o) leaveGroup(o); },
+  iAm: function (d) {
+    var o = d.kind === 'tontine' ? tontine(d.id) : coti(d.id); if (!o || !sbUser) return;
+    var list = d.kind === 'tontine' ? o.members : o.participants;
+    list.forEach(function (m) { if (m.uid === sbUser.id) delete m.uid; });
+    if (d.ix === 'new') list.push({ name: S.settings.name || 'Moi', uid: sbUser.id, paid: 0 }); else list[Number(d.ix)].uid = sbUser.id;
+    o.meIndex = myIdx(o); save(); render(); syncSoon(); toast("C'est noté."); 
+  },
+  cotiTick: function (d) { var c = coti(d.id), x = c.participants[Number(d.ix)], amt = Number(c.amount) || 0; var snap = snapshot(); if ((Number(x.paid) || 0) > 0) x.paid = 0; else if (amt) x.paid = amt; else { ui.editP = d.ix; render(); return; } save(); render(); toast(x.paid ? x.name + ' a cotisé ' + money(x.paid) + '.' : 'Paiement retiré.', snap); },
+  cotiPay: function (d) { var c = coti(d.id), x = c.participants[Number(d.ix)]; x.paid = Math.max(0, Number(F.cpAmt) || 0); F = {}; ui = {}; save(); render(); toast(x.name + ' : ' + money(x.paid) + '.'); },
+  cotiAdd: function (d) { var c = coti(d.id), n = (F.cpNew || '').trim(); if (!n) return; c.participants.push({ name: n, paid: 0 }); F = {}; save(); render(); },
+  delCoti: function (d) { var snap = snapshot(), c = coti(d.id); if (c && c.gid && sb && sbUser) sb.from('group_members').delete().eq('group_id', c.gid).eq('user_id', sbUser.id); S.cotis = S.cotis.filter(function (x) { return x.id !== d.id; }); save(); F = {}; stack = []; tab('plus'); go('cotis'); toast('Cotisation supprimée.', snap); },
   selAll: function (d) { var on = d.v === '1'; filteredContacts().forEach(function (c) { if (!isKnownContact(c)) ui.sel[c.id] = on; }); var cl = document.getElementById('clist'); if (cl) cl.innerHTML = contactList(); ['ccount', 'ccount2'].forEach(function (i) { var e = document.getElementById(i); if (e) e.textContent = selCount(); }); },
   signIn: function () { signIn(); },
   signOut: function () { signOut(); },
@@ -2135,6 +2323,21 @@ var ACT = {
   resetAll: function () { var snap = snapshot(); if (sb && sbUser) { try { sb.auth.signOut(); } catch (e) { } sbUser = null; } S = fresh(); save(); applyTheme(); F = {}; stack = []; view = { name: 'splash', p: {} }; ui = {}; render(); toast('Toutes les données ont été effacées.', snap); }
 };
 var SUBMIT = {
+  coti: function () {
+    var name = (F.name || '').trim(); if (!name) { ui.err = 'Indiquez pour quoi est la cotisation.'; render(); return; }
+    var lines = String(F.partsTxt || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
+    var ex = view.p.id ? coti(view.p.id) : null, me = -1;
+    var parts = lines.map(function (l, i) {
+      var isMe = me < 0 && /^moi$/i.test(l); if (isMe) me = i;
+      var nm = isMe ? (S.settings.name || 'Moi') : l;
+      var old = ex ? ex.participants.filter(function (o, oi) { return (isMe && oi === myIdx(ex)) || o.name.toLowerCase() === nm.toLowerCase(); })[0] : null;
+      var o = { name: nm, paid: old ? old.paid : 0 }; if (old && old.uid) o.uid = old.uid; if (isMe && sbUser) o.uid = sbUser.id; return o;
+    });
+    var data = { name: name, date: F.date || '', amount: Number(F.amount) || '', target: Number(F.target) || '', notes: F.notes || '', participants: parts, meIndex: me };
+    if (ex) Object.assign(ex, data); else (S.cotis || (S.cotis = [])).push(Object.assign({ id: uid() }, data));
+    save(); F = {}; back(); toast('Cotisation enregistrée.');
+  },
+  join: function () { joinGroup(F.jcode); },
   item: function () {
     var title = (F.title || '').trim(); if (!title) { ui.err = 'Indiquez de quoi il s\'agit.'; render(); var el = document.getElementById('f-title'); if (el) el.focus(); return; }
     if (F.type === 'dette' && !(Number(F.amount) > 0)) { ui.err = 'Indiquez le montant de la dette en FCFA.'; render(); return; }
@@ -2183,8 +2386,10 @@ var SUBMIT = {
     if (!(amt > 0)) { ui.err = 'Indiquez la cotisation en FCFA.'; render(); return; }
     if (lines.length < 2) { ui.err = 'Ajoutez au moins deux membres, un par ligne.'; render(); return; }
     var me = -1, members = lines.map(function (l, i) { if (me < 0 && /^moi$/i.test(l)) { me = i; return { name: S.settings.name || 'Moi' }; } var p = S.people.filter(function (x) { return x.name.toLowerCase() === l.toLowerCase(); })[0]; return { name: l, personId: p ? p.id : '' }; });
-    var data = { name: name, amount: amt, freq: F.freq || 'mensuel', start: F.start || today(), members: members, meIndex: me };
     var ex = view.p.id ? tontine(view.p.id) : null;
+    if (ex) members.forEach(function (m, i) { var old = ex.members.filter(function (o) { return o.name.toLowerCase() === m.name.toLowerCase(); })[0]; if (old && old.uid) m.uid = old.uid; });
+    if (me >= 0 && sbUser) { members.forEach(function (m) { if (m.uid === sbUser.id) delete m.uid; }); members[me].uid = sbUser.id; }
+    var data = { name: name, amount: amt, freq: F.freq || 'mensuel', start: F.start || today(), members: members, meIndex: me };
     if (ex) Object.assign(ex, data); else S.tontines.push(Object.assign({ id: uid(), on: true, paid: {} }, data));
     save(); F = {}; back(); toast('Tontine enregistrée.' + (me < 0 ? ' Astuce : écrivez « Moi » dans la liste pour vos rappels.' : ''));
   },
@@ -2269,6 +2474,7 @@ render();
 checkReminders();
 initNative();
 initSync();
+setInterval(function () { if (sbUser && !document.hidden) syncNow(false); }, 120000);
 if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
 flushOutbox();
 
