@@ -236,7 +236,7 @@ var VERSION = '0.3 bêta';
 var BUILD = Number(window.BS_BUILD || 0);
 var UPDATE_URL = 'https://bestsupport.mrdnej.com/version.json';
 var N = (window.BSNative && window.BSNative.isNative) ? window.BSNative : null;
-var MRDNEJ_URL = ''; // lien du futur site #MrDNEJ, à renseigner quand il existera
+var MRDNEJ_URL = 'https://mrdnej.com/fr/projects/best-support';
 var KEY = 'bestsupport.v1';
 var EMBED = (function () { try { return window.self !== window.top; } catch (e) { return true; } })();
 var CIRCLES = {
@@ -1250,7 +1250,7 @@ function V_about() {
   h += '<section class="card" style="align-items:center;text-align:center;gap:14px;padding:24px 18px"><img src="icon-192.png" alt="" width="88" height="88" style="border-radius:22px"><div class="word" style="font-size:30px"><span class="b">Best</span> <span class="s">Support</span></div><div class="tagline" style="font-size:11px">Vos relations, toujours en tête</div>' +
     '<p class="muted" style="max-width:34ch">Un assistant personnel pour ne jamais oublier ses proches, ses engagements et les moments qui comptent, pensé pour la Côte d\'Ivoire. Chaque jour, il vous dit qui ou quoi mérite votre attention, et il respecte votre jour de repos.</p>' +
     '<p style="font-weight:800">Une initiative ' + (MRDNEJ_URL ? '<a href="' + esc(MRDNEJ_URL) + '" target="_blank" rel="noopener">#MrDNEJ</a>' : '<span style="color:var(--orange-ink)">#MrDNEJ</span>') + '</p>' +
-    '<p class="tiny muted">Par N\'Dri Edmond Junior DADIÉ' + (MRDNEJ_URL ? '' : ' · site #MrDNEJ bientôt disponible') + '</p></section>';
+    '<p class="tiny muted">Par N\'Dri Edmond Junior DADIÉ' + '</p></section>';
 
   h += '<section class="card"><div class="row"><span class="av o">' + ic('star') + '</span><div class="grow"><h2 class="h2">Programme testeurs</h2><p class="small muted">Aidez-nous à améliorer Best Support pendant la phase bêta.</p></div></div>';
   if (!S.tester) {
