@@ -22,6 +22,7 @@
 <meta name="apple-mobile-web-app-title" content="Best Support">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="Vos relations, toujours en tête. Une initiative #MrDNEJ.">
+<script src="sb.js"></script>
 <title>Best Support</title>
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0B3D2E">
@@ -231,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.4 bêta';
+var VERSION = '0.5 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -344,7 +345,7 @@ function load() {
   return fresh();
 }
 var S = load();
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } scheduleSoon(); }
+function save() { try { stampChanges(); } catch (e) { } try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } scheduleSoon(); syncSoon(); }
 function applyTheme() { try { document.documentElement.style.setProperty('--zoom', String(Number(S.settings.zoom) || 1)); } catch (e) { } if (S.settings.theme) document.documentElement.setAttribute('data-theme', S.settings.theme); else document.documentElement.removeAttribute('data-theme'); }
 applyTheme();
 
@@ -695,7 +696,7 @@ function initNative() {
   N.App.addListener('appStateChange', function (st) {
     if (!st.isActive) { hiddenAt = Date.now(); return; }
     if (lockOn() && Date.now() - hiddenAt > 60000) locked = true;
-    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); render();
+    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); render();
   });
   N.App.addListener('backButton', function () { if (locked) { N.App.minimizeApp(); return; } if (stack.length) { F = {}; back(); } else if (view.name !== 'home' && S.settings.onboarded) tab('home'); else N.App.minimizeApp(); });
   syncCalls();
@@ -855,7 +856,8 @@ function V_onb(p) {
     notifCard() + installCard() + dots(4) +
     (N ? '<button type="button" class="btn btn-ghost btn-block" data-act="finishOnb" data-import="1">' + ic('users', 18) + ' Choisir dans mes contacts</button>' : '') +
     '<button type="button" class="btn btn-dark btn-block" data-act="finishOnb">Commencer</button>' +
-    '<button type="button" class="btn btn-ghost btn-block" data-act="finishOnb" data-demo="1">Découvrir avec des exemples</button></div>';
+    '<button type="button" class="btn btn-ghost btn-block" data-act="finishOnb" data-demo="1">Découvrir avec des exemples</button>' +
+    (window.BSSupabase ? '<button type="button" class="btn btn-link" data-act="signIn">' + googleG() + ' J\'ai déjà un compte : se connecter avec Google</button>' : '') + '</div>';
 }
 function circleOptions(sel) { var s = ''; for (var k in CIRCLES) s += '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + CIRCLES[k].label + '</option>'; return s; }
 function dayOptions(sel) { return DAYS.map(function (d, i) { return '<option value="' + i + '"' + (Number(sel) === i ? ' selected' : '') + '>' + d + '</option>'; }).join(''); }
@@ -1195,7 +1197,7 @@ function V_personForm(p0) {
 function V_plus() {
   var rows = [['bilan', 'chart', 'Bilan de la semaine', 'Votre semaine en quelques mots'], ['tontines', 'coins', 'Tontines', 'Cotisations, tours et rappels'], ['gifts', 'heart', 'Registre des dons', 'Ce que vous avez reçu et donné'], ['routines', 'shirt', 'Routines de veille', 'Préparer le dimanche et les cérémonies'], ['importContacts', 'users', 'Ajouter mes contacts', 'Répertoire du téléphone ou fichier .vcf'], ['calendars', 'calendar', 'Mon agenda Google', 'Importer vos évènements'], ['news', 'sparkle', 'Nouveautés', 'Ce qui a changé'], ['report', 'flag', 'Signaler un problème ou une idée', 'Aidez-nous à améliorer l\'app'], ['about', 'info', 'À propos et testeurs', 'Une initiative #MrDNEJ, vos suggestions'], ['settings', 'gear', 'Paramètres', 'Prénom, repos, rappels, sauvegarde']];
   var h = '<div class="screen"><h1 class="h1">Plus</h1><div class="list">' + rows.map(function (r) { return '<button type="button" class="li" data-act="go" data-to="' + r[0] + '"><span class="av">' + ic(r[1]) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + r[2] + '</span><span class="sub">' + r[3] + '</span></span>' + ic('chev', 18) + '</button>'; }).join('') + '</div>';
-  h += installCard() + notifCard();
+  h += accountCard() + installCard() + notifCard();
   return h + '</div>';
 }
 
@@ -1297,6 +1299,7 @@ function V_about() {
 function V_settings() {
   if (!F._init) F = { _init: 1, name: S.settings.name, restDay: S.settings.restDay, eveHour: S.settings.eveHour, support: S.settings.support, theme: S.settings.theme || '' };
   var h = '<div class="screen"><div class="row"><button type="button" class="iconbtn" data-act="back" aria-label="Retour">' + ic('back') + '</button><h1 class="h1">Paramètres</h1></div>';
+  h += accountCard();
   h += '<form class="card" data-form="settings" novalidate>' +
     '<div class="field"><label for="s-name">Votre prénom</label><input class="in" id="s-name" data-f="name" value="' + esc(F.name) + '"></div>' +
     '<div class="grid2"><div class="field"><label for="s-rest">Jour de repos</label><select class="in" id="s-rest" data-f="restDay">' + dayOptions(F.restDay) + '</select></div>' +
@@ -1674,6 +1677,144 @@ function searchResults() {
   return rows.length ? '<div class="list">' + rows.slice(0, 60).join('') + '</div>' : '<p class="small muted">Aucun résultat pour « ' + esc(ui.gq) + ' ».</p>';
 }
 
+/* Compte Google et synchronisation entre appareils */
+var sb = null, sbUser = null, syncBusy = false, syncErr = '', syncTimer = null;
+var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts'];
+var LOCAL_SETTINGS = ['lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom'];
+function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h; }
+function syncRecords() {
+  var out = {};
+  SYNC_COLS.forEach(function (k) { (S[k] || []).forEach(function (r) { if (r && r.id) out[k + ':' + r.id] = { kind: k, rid: r.id, obj: r }; }); });
+  var st = {}; for (var k in S.settings) if (LOCAL_SETTINGS.indexOf(k) < 0) st[k] = S.settings[k];
+  out['settings:main'] = { kind: 'settings', rid: 'main', obj: st };
+  out['meta:checks'] = { kind: 'meta', rid: 'checks', obj: S.checks || {} };
+  out['meta:snooze'] = { kind: 'meta', rid: 'snooze', obj: S.snooze || {} };
+  return out;
+}
+function stampChanges() {
+  if (!S.sync || !S.sync.uid) return;
+  var Y = S.sync, h = Y.h || (Y.h = {}), now = Date.now(), recs = syncRecords();
+  Y.dirty = Y.dirty || {}; Y.ts = Y.ts || {};
+  for (var key in recs) { var hv = hashStr(JSON.stringify(recs[key].obj)); if (h[key] !== hv) { h[key] = hv; Y.dirty[key] = now; Y.ts[key] = now; } }
+  for (var k2 in h) if (!recs[k2]) { delete h[k2]; Y.dirty[k2] = now; Y.ts[k2] = now; }
+}
+function syncSoon() { if (!sbUser) return; clearTimeout(syncTimer); syncTimer = setTimeout(syncNow, 2500); }
+function applyRow(row) {
+  var key = row.kind + ':' + row.rid, Y = S.sync;
+  if (Number(row.updated_at) <= (Y.ts[key] || 0)) return false;
+  if (Y.dirty[key] && Y.dirty[key] > Number(row.updated_at)) return false;
+  if (row.kind === 'settings') { if (row.data) for (var k in row.data) if (LOCAL_SETTINGS.indexOf(k) < 0) S.settings[k] = row.data[k]; }
+  else if (row.kind === 'meta') { if (row.rid === 'checks') S.checks = row.data || {}; if (row.rid === 'snooze') S.snooze = row.data || {}; }
+  else if (SYNC_COLS.indexOf(row.kind) >= 0) {
+    var arr = S[row.kind] || (S[row.kind] = []), at = -1;
+    for (var i = 0; i < arr.length; i++) if (arr[i].id === row.rid) { at = i; break; }
+    if (row.deleted) { if (at >= 0) arr.splice(at, 1); }
+    else if (row.data) { if (at >= 0) arr[at] = row.data; else arr.push(row.data); }
+  } else return false;
+  Y.ts[key] = Number(row.updated_at); delete Y.dirty[key];
+  var recs = syncRecords(); if (recs[key]) Y.h[key] = hashStr(JSON.stringify(recs[key].obj)); else delete Y.h[key];
+  return true;
+}
+function syncNow(manual) {
+  if (!sb || !sbUser || syncBusy) return Promise.resolve();
+  if (typeof navigator.onLine === 'boolean' && !navigator.onLine) { if (manual) toast('Pas de connexion : la synchronisation reprendra toute seule.'); return Promise.resolve(); }
+  syncBusy = true; syncErr = '';
+  stampChanges();
+  if (S.sync.fresh) {
+    return sb.from('records').select('kind,rid,data,updated_at,deleted,server_at').gt('server_at', '1970-01-01T00:00:00Z').order('server_at', { ascending: true }).limit(5000).then(function (res) {
+      if (res.error) throw res.error;
+      var Y = S.sync;
+      (res.data || []).forEach(function (row) { var k = row.kind + ':' + row.rid; delete Y.dirty[k]; Y.ts[k] = 0; applyRow(row); if (!Y.pulledAt || row.server_at > Y.pulledAt) Y.pulledAt = row.server_at; });
+      Y.fresh = false; syncBusy = false;
+      try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
+      applyTheme(); scheduleSoon(); render();
+      return syncNow(manual);
+    }).catch(function (e) { syncBusy = false; syncErr = errMsg(e); if (manual) toast('Synchronisation impossible pour le moment. (' + syncErr + ')'); });
+  }
+  var Y = S.sync, recs = syncRecords(), keys = Object.keys(Y.dirty || {});
+  var rows = keys.map(function (k) { var r = recs[k], a = k.split(':'); return { kind: a[0], rid: a.slice(1).join(':'), data: r ? r.obj : null, updated_at: Y.dirty[k], deleted: !r, device: N ? 'android' : platformName() }; });
+  var push = rows.length ? sb.rpc('push_records', { rows: rows }).then(function (res) { if (res.error) throw res.error; keys.forEach(function (k, i) { if (Y.dirty[k] === rows[i].updated_at) delete Y.dirty[k]; }); }) : Promise.resolve();
+  var changed = 0;
+  return push.then(function () {
+    var since = Y.pulledAt ? new Date(new Date(Y.pulledAt).getTime() - 2000).toISOString() : '1970-01-01T00:00:00Z';
+    return sb.from('records').select('kind,rid,data,updated_at,deleted,server_at').gt('server_at', since).order('server_at', { ascending: true }).limit(2000);
+  }).then(function (res) {
+    if (res.error) throw res.error;
+    (res.data || []).forEach(function (row) { if (applyRow(row)) changed++; if (!Y.pulledAt || row.server_at > Y.pulledAt) Y.pulledAt = row.server_at; });
+    Y.at = Date.now(); syncBusy = false;
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
+    if (changed) { applyTheme(); scheduleSoon(); }
+    if (changed || manual || view.name === 'settings') render();
+    if (manual) toast(changed ? plural(changed, 'élément reçu') + ' de vos autres appareils.' : 'Tout est synchronisé.');
+  }).catch(function (e) { syncBusy = false; syncErr = errMsg(e); if (manual) toast('Synchronisation impossible pour le moment. (' + syncErr + ')'); if (view.name === 'settings') render(); });
+}
+function onLogin() {
+  if (!S.settings.onboarded) { S.settings.onboarded = true; S.settings.firstUse = today(); S.settings.seenVersion = VERSION; stack = []; view = { name: 'home', p: {} }; }
+  if (!S.sync || S.sync.uid !== sbUser.id) {
+    if (S.demo) clearDemo();
+    S.sync = { uid: sbUser.id, email: sbUser.email, h: {}, ts: {}, dirty: {}, pulledAt: null, at: 0 };
+    stampChanges();
+    S.sync.fresh = true;
+  }
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
+  syncNow(false).then(function () { toast('Connecté : ' + (sbUser.email || 'compte Google') + '. Vos données sont synchronisées.'); render(); });
+}
+function initSync() {
+  if (!window.BSSupabase) return;
+  try {
+    sb = window.BSSupabase.createClient(SB_URL, SB_KEY, { auth: { flowType: 'pkce', persistSession: true, autoRefreshToken: true, detectSessionInUrl: !N, storageKey: 'bestsupport-auth' } });
+  } catch (e) { sb = null; return; }
+  sb.auth.onAuthStateChange(function (ev, session) {
+    var u = session && session.user ? session.user : null, was = sbUser && sbUser.id;
+    sbUser = u;
+    if (u && was !== u.id && ev === 'SIGNED_IN') onLogin();
+    else if (u && !was) syncNow(false);
+    if (!N && /[?&]code=/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { } }
+    render();
+  });
+  if (N && N.App) N.App.addListener('appUrlOpen', function (ev) {
+    if (!ev || !ev.url || ev.url.indexOf('login-callback') < 0) return;
+    try { N.Browser.close(); } catch (e) { }
+    var m = ev.url.match(/[?&#]code=([^&#]+)/), er = ev.url.match(/[?&#]error_description=([^&#]+)/);
+    if (m) sb.auth.exchangeCodeForSession(decodeURIComponent(m[1])).then(function (r) { if (r.error) toast('Connexion refusée. (' + r.error.message + ')'); });
+    else if (er) toast('Connexion annulée. (' + decodeURIComponent(er[1].replace(/\+/g, ' ')) + ')');
+  });
+  window.addEventListener('online', function () { syncNow(false); });
+}
+function signIn() {
+  if (!sb) { toast("La connexion n'est pas disponible ici. Utilisez l'app Android ou bestsupport.mrdnej.com."); return; }
+  if (typeof navigator.onLine === 'boolean' && !navigator.onLine) { toast('Connectez-vous à internet pour vous connecter avec Google.'); return; }
+  if (N) {
+    sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'ci.mrdnej.bestsupport://login-callback', skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } } })
+      .then(function (r) { if (r.error) throw r.error; return N.Browser.open({ url: r.data.url, presentationStyle: 'popover' }); })
+      .catch(function (e) { toast('Connexion impossible. (' + errMsg(e) + ')'); });
+  } else {
+    sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } })
+      .then(function (r) { if (r.error) toast('Connexion impossible. (' + r.error.message + ')'); });
+  }
+}
+function signOut() {
+  if (!sb) return;
+  syncNow(false).then(function () { return sb.auth.signOut(); }).then(function () {
+    sbUser = null; delete S.sync; try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { }
+    ui = {}; render(); toast('Déconnecté. Vos données restent sur cet appareil.');
+  });
+}
+function accountCard() {
+  if (sbUser) {
+    var when = S.sync && S.sync.at ? new Date(S.sync.at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : 'jamais';
+    var pending = S.sync ? Object.keys(S.sync.dirty || {}).length : 0;
+    return '<section class="card"><div class="row"><span class="av">' + ic('user') + '</span><div class="grow stack" style="gap:2px"><span class="ttl">' + esc(sbUser.email || 'Compte Google') + '</span><span class="sub">' + (syncBusy ? 'Synchronisation…' : 'Synchronisé : ' + esc(when)) + (pending ? ' · ' + pending + ' en attente' : '') + '</span></div></div>' +
+      (syncErr ? '<p class="tiny" style="color:var(--hi-fg)">Dernière erreur : ' + esc(syncErr) + '</p>' : '') +
+      '<div class="grid2"><button type="button" class="btn btn-ghost" data-act="syncNow">' + ic('download', 18) + ' Synchroniser</button><button type="button" class="btn btn-ghost" data-act="signOut">Se déconnecter</button></div>' +
+      '<p class="tiny muted">Connectez-vous avec le même compte Google sur votre téléphone et votre ordinateur : vos proches, engagements, tontines et dons sont les mêmes partout. Le verrouillage et les réglages du téléphone restent propres à chaque appareil.</p></section>';
+  }
+  return '<section class="card"><div class="row"><span class="av o">' + ic('user') + '</span><div class="grow stack" style="gap:2px"><span class="ttl">Compte et synchronisation</span><span class="sub">Retrouvez vos données sur tous vos appareils</span></div></div>' +
+    '<button type="button" class="btn btn-dark btn-block" data-act="signIn">' + googleG() + ' Se connecter avec Google</button>' +
+    '<p class="tiny muted">Facultatif. Sans compte, tout reste sur cet appareil. Avec un compte, vos données sont sauvegardées en ligne, visibles par vous seul, et l\'app marche toujours sans internet.</p></section>';
+}
+function googleG() { return '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 38.2 44 33 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>'; }
+
 /* Envoi des retours vers la base Best Support (file d'attente hors ligne) */
 function platformName() { if (N) return 'android'; if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return 'iphone'; if (/android|mobile/i.test(navigator.userAgent)) return 'web'; return 'ordinateur'; }
 function queueFeedback(f) {
@@ -1722,6 +1863,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.5 bêta', items: ['Connexion avec Google : vos données sauvegardées en ligne et synchronisées entre votre téléphone et votre ordinateur', 'Chaque membre de la famille se connecte avec son propre compte Google'] },
   { v: '0.4 bêta', items: ['Widget Android : votre priorité du jour sur l\'écran d\'accueil', 'Vos retours et signalements arrivent directement à Edmond, même envoyés hors ligne'] },
   { v: '0.3 bêta', items: ['Contacts réparés : « Choisir un contact », import de tout le répertoire ou d\'un fichier .vcf', 'Plusieurs numéros par proche : Appel, WhatsApp, Autre', 'Votre agenda Google importé automatiquement (Android)', 'Saisie vocale : dites « Rappelle-moi de rembourser Koffi 15 000 francs vendredi »', 'Lecture à voix haute de vos priorités', 'Ajout rapide, recherche, partage d\'un rappel, modèles d\'évènements', 'Calendrier du mois, grande police, bouton « Signaler »'] },
   { v: '0.2 bêta', items: ['Application Android : rappels même app fermée', 'Tontines, registre des dons, remboursements partiels', 'Verrouillage, messages prêts, engagements récurrents'] }
@@ -1866,6 +2008,9 @@ var ACT = {
     toast(plural(nNew, 'proche importé') + (nMerged ? ', ' + plural(nMerged, 'fiche complétée') : '') + '. Ajustez cercle et numéro WhatsApp dans chaque fiche.');
   },
   pickContact: function () { pickOneContact(); },
+  signIn: function () { signIn(); },
+  signOut: function () { signOut(); },
+  syncNow: function () { syncNow(true); },
   loadContacts: function () { loadPhoneContacts(); },
   addPhone: function () { F.phones.push({ n: '', label: F.phones.some(function (x) { return x.label === 'whatsapp'; }) ? 'autre' : 'whatsapp' }); render(); var el = document.getElementById('p-ph' + (F.phones.length - 1)); if (el) el.focus(); },
   delPhone: function (d) { F.phones.splice(Number(d.i), 1); render(); },
@@ -1930,7 +2075,7 @@ var ACT = {
   doImport: function () { try { var s = JSON.parse(ui.pending); if (!s || !Array.isArray(s.people) || !Array.isArray(s.items)) throw 0; var snap = snapshot(); S = s; save(); applyTheme(); F = {}; ui = {}; render(); toast('Données importées.', snap); } catch (e) { ui.importOk = ''; render(); toast("Ce fichier n'est pas une sauvegarde Best Support."); } },
   loadDemo: function () { var snap = snapshot(); loadDemo(); save(); tab('home'); toast("Exemples chargés.", snap); },
   clearDemo: function () { var snap = snapshot(); clearDemo(); save(); tab('home'); toast('Exemples effacés.', snap); },
-  resetAll: function () { var snap = snapshot(); S = fresh(); save(); applyTheme(); F = {}; stack = []; view = { name: 'splash', p: {} }; ui = {}; render(); toast('Toutes les données ont été effacées.', snap); }
+  resetAll: function () { var snap = snapshot(); if (sb && sbUser) { try { sb.auth.signOut(); } catch (e) { } sbUser = null; } S = fresh(); save(); applyTheme(); F = {}; stack = []; view = { name: 'splash', p: {} }; ui = {}; render(); toast('Toutes les données ont été effacées.', snap); }
 };
 var SUBMIT = {
   item: function () {
@@ -2064,11 +2209,12 @@ document.addEventListener('visibilitychange', function () { if (N) return; if (d
 render();
 checkReminders();
 initNative();
+initSync();
 if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
 flushOutbox();
 
 // exposé pour les tests
-window.__BS = { parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
+window.__BS = { sync: syncNow, parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
 })();
 </script>
 

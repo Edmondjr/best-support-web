@@ -1,6 +1,6 @@
 {
-  "build": 5,
-  "version": "0.4 bêta",
+  "build": 6,
+  "version": "0.5 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Widget Android et retours envoyés directement."
+  "notes": "Connexion Google et synchronisation entre appareils."
 }
