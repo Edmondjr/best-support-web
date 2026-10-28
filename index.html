@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.8.1 bêta';
+var VERSION = '0.8.2 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -338,7 +338,7 @@ function defaultRoutine() {
   return { id: 'culte', title: 'Culte du dimanche', day: 0, time: '09:00', on: true, checklist: ['Tenue repassée', 'Bible', 'Offrande', 'Transport prévu'] };
 }
 function fresh() {
-  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: true, asrModel: 'small', voice: '', voiceRate: 0.95, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
+  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: true, asrModel: 'auto', voice: '', voiceRate: 0.95, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
 }
 function load() {
   try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); var f = fresh(); for (var k in f) if (s[k] == null) s[k] = f[k]; for (var k2 in f.settings) if (s.settings[k2] == null) s.settings[k2] = f.settings[k2]; (s.people || []).forEach(function (p) { if (!p.phones) p.phones = p.phone ? [{ n: p.phone, label: 'appel' }] : []; }); return s; } } catch (e) { }
@@ -1334,6 +1334,7 @@ function V_settings() {
     switchRow('Utiliser mon journal d\'appels', !!S.settings.callSync, 'callSyncToggle', '', 'callSync') +
     switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') +
     (S.settings.callSync ? '<button type="button" class="btn btn-ghost" data-act="syncCallsNow">Vérifier maintenant</button>' : '') + '</section>';
+  if (!ui.asrPick && !ui.asrPicking) { ui.asrPicking = 1; var keep = S.settings.asrModel; S.settings.asrModel = 'auto'; pickAsrModel().then(function (k) { ui.asrPick = k; if (view.name === 'settings') render(); }); S.settings.asrModel = keep; }
   if (!VOICE_LIST && !ui.voicesLoading) { ui.voicesLoading = 1; loadVoices().then(function () { if (view.name === 'settings') render(); }); }
   var vl = VOICE_LIST || [], cur = pickVoice(vl), hasQ = vl.some(function (v) { return v.q >= 50; });
   h += '<section class="card"><h2 class="h2">Lecture à voix haute</h2><p class="small muted">Best Support choisit la meilleure voix française de votre appareil. Vous pouvez en essayer d\'autres.</p>' +
@@ -1341,7 +1342,7 @@ function V_settings() {
     '<div class="field"><label for="s-vrate">Vitesse</label><select class="in" id="s-vrate">' + [['0.85', 'Lente'], ['0.95', 'Normale'], ['1.05', 'Rapide']].map(function (x) { return '<option value="' + x[0] + '"' + (String(S.settings.voiceRate || 0.95) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     '<button type="button" class="btn btn-ghost btn-block" data-act="testVoice">' + ic('speaker', 18) + ' Écouter un exemple</button>' +
     (N && !hasQ ? '<div class="note">' + ic('info', 18) + '<span>Pour une voix plus naturelle, installez les voix françaises « haute qualité » de Google : Paramètres Android, Synthèse vocale, Google, Installer les données vocales, Français.</span></div><button type="button" class="btn btn-link" data-act="installVoices">Ouvrir l\'installation des voix</button>' : '') + '</section>';
-  h += '<section class="card"><h2 class="h2">Transcription des appels</h2><p class="small muted">Le modèle tourne sur votre appareil. « Précis » (recommandé) reconnaît bien mieux le français. Il est plus lourd à télécharger une seule fois, et un peu plus long à transcrire. « Rapide » convient aux téléphones modestes.</p><div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="Modèle">' + Object.keys(ASR_MODELS).map(function (k) { return '<button type="button" aria-pressed="' + ((S.settings.asrModel || 'small') === k) + '" data-act="setAsr" data-v="' + k + '">' + ASR_MODELS[k].label + ' (' + ASR_MODELS[k].size + ')</button>'; }).join('') + '</div></section>';
+  h += '<section class="card"><h2 class="h2">Transcription des appels</h2><p class="small muted">Le modèle tourne sur votre appareil. « Automatique » (recommandé) prend le modèle précis si votre téléphone est assez puissant pour aller vite, sinon le modèle rapide.' + (ui.asrPick ? ' Sur cet appareil : ' + ASR_MODELS[ui.asrPick].label + '.' : '') + '</p><div class="seg" style="grid-template-columns:1fr" role="group" aria-label="Modèle">' + Object.keys(ASR_MODELS).map(function (k) { return '<button type="button" aria-pressed="' + ((S.settings.asrModel || 'auto') === k) + '" data-act="setAsr" data-v="' + k + '">' + ASR_MODELS[k].label + ' (' + ASR_MODELS[k].size + ')</button>'; }).join('') + '</div></section>';
   h += '<form class="card" data-form="lockset" novalidate><h2 class="h2">Verrouillage</h2><p class="small muted">Protégez vos dettes et vos notes privées.</p>' +
     '<div class="field"><label for="s-lock">Mode</label><select class="in" id="s-lock" data-f="lock" data-rerender="1">' + [['none', 'Aucun'], ['pin', 'Code PIN']].concat(N ? [['bio', 'Empreinte (avec code de secours)']] : []).map(function (x) { var cur = F.lock != null ? F.lock : (S.settings.lock || 'none'); return '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     ((F.lock != null ? F.lock : S.settings.lock || 'none') !== 'none' ? '<div class="grid2"><div class="field"><label for="s-pin1">' + (S.settings.pinHash ? 'Nouveau code (facultatif)' : 'Code (4 à 6 chiffres)') + '</label><input class="in" id="s-pin1" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin1" value="' + esc(F.pin1 || '') + '"></div><div class="field"><label for="s-pin2">Confirmer</label><input class="in" id="s-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin2" value="' + esc(F.pin2 || '') + '"></div></div>' : '') +
@@ -1830,8 +1831,20 @@ function decodeAudioBlob(blob) {
     });
   });
 }
-var ASR_MODELS = { small: { id: 'onnx-community/whisper-small', label: 'Précis', size: 'environ 250 Mo' }, base: { id: 'onnx-community/whisper-base', label: 'Rapide', size: 'environ 80 Mo' } };
-var asrWorker = null;
+var ASR_MODELS = { auto: { id: '', label: 'Automatique', size: '80 à 250 Mo selon le téléphone' }, small: { id: 'onnx-community/whisper-small', label: 'Précis', size: 'environ 250 Mo' }, base: { id: 'onnx-community/whisper-base', label: 'Rapide', size: 'environ 80 Mo' } };
+var asrWorker = null, ASR_PICK = null;
+function pickAsrModel() {
+  var m = S.settings.asrModel || 'auto';
+  if (m !== 'auto' && ASR_MODELS[m]) return Promise.resolve(m);
+  if (ASR_PICK) return Promise.resolve(ASR_PICK);
+  var mem = navigator.deviceMemory || 4, cpu = navigator.hardwareConcurrency || 4;
+  var gpu = navigator.gpu && navigator.gpu.requestAdapter ? navigator.gpu.requestAdapter().then(function (a) { return !!a; }).catch(function () { return false; }) : Promise.resolve(false);
+  return gpu.then(function (hasGpu) {
+    // Vitesse d'abord : modèle précis seulement si la carte graphique est utilisable, ou si le téléphone est très puissant.
+    ASR_PICK = (hasGpu && mem >= 4) || (mem >= 8 && cpu >= 8) ? 'small' : 'base';
+    return ASR_PICK;
+  });
+}
 function runTranscription(blob, name) {
   ui.au = { stage: 'decode', name: name || 'audio', pct: 0, text: '', props: null, err: '' }; render();
   decodeAudioBlob(blob).then(function (d) {
@@ -1847,8 +1860,7 @@ function runTranscription(blob, name) {
       else if (m.type === 'error') { a.stage = 'error'; a.err = /fetch|network|Failed to fetch/i.test(m.message) ? 'Le modèle de transcription doit être téléchargé une première fois : connectez-vous à internet (de préférence en Wi-Fi) puis réessayez.' : 'Transcription impossible. (' + m.message + ')'; }
       var box = document.getElementById('aubox'); if (box && view.name === 'audio') box.innerHTML = audioBox(); else render();
     };
-    var model = (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.small).id;
-    asrWorker.postMessage({ type: 'transcribe', model: model, audio: d.pcm }, [d.pcm.buffer]);
+    pickAsrModel().then(function (k) { ui.au.model = ASR_MODELS[k].label; asrWorker.postMessage({ type: 'transcribe', model: ASR_MODELS[k].id, audio: d.pcm }, [d.pcm.buffer]); });
   }).catch(function (e) {
     ui.au.stage = 'error'; ui.au.err = /decode|EncodingError|Unable/i.test(errMsg(e)) ? "Ce format audio n'est pas lu par cet appareil. Essayez un fichier .m4a, .mp3 ou .wav, ou la note vocale WhatsApp depuis un téléphone Android." : errMsg(e); render();
   });
@@ -1858,7 +1870,7 @@ function audioBox() {
   var mins = a.seconds ? Math.max(1, Math.round(a.seconds / 60)) : 0;
   if (a.stage === 'error') return '<div class="note o">' + ic('info', 18) + '<span>' + esc(a.err) + '</span></div>';
   if (a.stage !== 'done') {
-    var lbl = a.stage === 'decode' ? 'Lecture du fichier…' : a.stage === 'download' ? 'Téléchargement du modèle de transcription (une seule fois' + (a.dlMb ? ', ' + a.dlMb + ' Mo' : '') + ') : ' + (a.dl || 0) + ' %' : a.stage === 'model' ? 'Préparation de la transcription…' : 'Transcription sur votre appareil : ' + a.pct + ' %';
+    var lbl = a.stage === 'decode' ? 'Lecture du fichier…' : a.stage === 'download' ? 'Téléchargement du modèle de transcription (une seule fois' + (a.dlMb ? ', ' + a.dlMb + ' Mo' : '') + ') : ' + (a.dl || 0) + ' %' : a.stage === 'model' ? 'Préparation de la transcription…' : 'Transcription sur votre appareil' + (a.model ? ' (mode ' + a.model.toLowerCase() + ')' : '') + ' : ' + a.pct + ' %';
     var pc = a.stage === 'download' ? (a.dl || 0) : a.stage === 'transcribe' ? a.pct : 5;
     return '<section class="card"><div class="ttl">' + esc(a.name) + (mins ? ' · ' + mins + ' min' : '') + '</div><p class="small">' + esc(lbl) + '</p><div class="bar"><i style="width:' + Math.max(3, pc) + '%;background:var(--green-2)"></i></div>' +
       (a.text ? '<p class="small muted" style="max-height:120px;overflow:auto">' + esc(a.text) + '</p>' : '') + '<p class="tiny muted">Rien ne quitte votre appareil. Comptez environ la durée de l\'enregistrement.</p></section>';
@@ -1883,7 +1895,7 @@ function V_audio(p0) {
   h += '<div id="aubox" class="stack" style="gap:14px">' + audioBox() + '</div>';
   if (!ui.au) {
     h += '<div class="note">' + ic('info', 18) + '<span>' + (N ? 'Astuce : dans WhatsApp ou votre app d\'enregistrement, touchez « Partager » puis Best Support : le fichier arrive ici directement.' : 'Sur iPhone : enregistrez la note vocale dans Fichiers (Partager, Enregistrer dans Fichiers), puis choisissez-la ici.') + '</span></div>';
-    h += '<div class="note o">' + ic('info', 18) + '<span>Pensez à prévenir la personne avant d\'enregistrer une conversation. La première analyse télécharge un modèle de transcription (' + (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.small).size + ') : faites-la en Wi-Fi.</span></div>';
+    h += '<div class="note o">' + ic('info', 18) + '<span>Pensez à prévenir la personne avant d\'enregistrer une conversation. La première analyse télécharge un modèle de transcription (' + (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.auto).size + ') : faites-la en Wi-Fi.</span></div>';
   }
   return h + '</div>';
 }
@@ -2295,6 +2307,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.8.2 bêta', items: ['Transcription en mode Automatique : Best Support choisit le modèle le plus précis que votre téléphone peut faire tourner rapidement'] },
   { v: '0.8.1 bêta', items: ['Note après appel activée d\'office (désactivable dans Paramètres), dès 2 secondes d\'appel avec un proche', 'Lecture à voix haute : la meilleure voix française de votre téléphone, dates, heures et montants bien prononcés', 'Choix de la voix et de la vitesse, avec un exemple à écouter', 'Transcription « Précis » par défaut, accélérée par la carte graphique quand le téléphone le permet'] },
   { v: '0.8 bêta', items: ['Après un appel avec un proche (Android) : une notification vous propose de noter une promesse, un rendez-vous ou une dette', 'Analyser un appel : enregistrement ou note vocale WhatsApp transcrit sur votre appareil, engagements détectés à valider', 'Partagez un fichier audio vers Best Support depuis WhatsApp ou votre enregistreur'] },
   { v: '0.7 bêta', items: ['Mode famille : partagez une tontine ou une cotisation avec un code, chacun voit qui a payé', 'Nouveau module Cotisations : mariages, funérailles, baptêmes, dot', 'Rejoindre un groupe avec le code reçu d\'un proche', 'Liens Confidentialité et Conditions dans À propos'] },
@@ -2707,7 +2720,8 @@ render();
 checkReminders();
 initNative();
 initSync();
-try { if (localStorage.getItem('bs-v081') !== '1') { localStorage.setItem('bs-v081', '1'); if (S.settings.asrModel === 'base') S.settings.asrModel = 'small'; if (S.settings.afterCall === false && localStorage.getItem('bs-ac-asked') !== '1') S.settings.afterCall = true; save(); } } catch (e) { }
+try { if (localStorage.getItem('bs-v082') !== '1') { localStorage.setItem('bs-v082', '1'); if (S.settings.asrModel === 'small' || S.settings.asrModel === 'base') S.settings.asrModel = 'auto'; } } catch (e) { }
+try { if (localStorage.getItem('bs-v081') !== '1') { localStorage.setItem('bs-v081', '1');  if (S.settings.afterCall === false && localStorage.getItem('bs-ac-asked') !== '1') S.settings.afterCall = true; save(); } } catch (e) { }
 if (N) {
   window.addEventListener('bsShared', handleShared);
   handleShared();

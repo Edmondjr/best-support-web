@@ -1,6 +1,6 @@
 {
-  "build": 13,
-  "version": "0.8.1 bêta",
+  "build": 14,
+  "version": "0.8.2 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Note après appel activée d'office, meilleure voix française, transcription Précis."
+  "notes": "Transcription automatique selon la puissance du téléphone, meilleure voix française."
 }
