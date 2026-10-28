@@ -1,5 +1,5 @@
 // Best Support : service worker (cache hors ligne + clic sur notification)
-var CACHE = 'bestsupport-v0.5.1';
+var CACHE = 'bestsupport-v0.6';
 var SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './sb.js', './fonts/plus-jakarta-sans-latin-400-normal.woff2', './fonts/plus-jakarta-sans-latin-600-normal.woff2', './fonts/plus-jakarta-sans-latin-700-normal.woff2', './fonts/plus-jakarta-sans-latin-800-normal.woff2'];
 
 self.addEventListener('install', function (e) {

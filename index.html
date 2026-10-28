@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.5.1 bêta';
+var VERSION = '0.6 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -281,7 +281,7 @@ var ICONS = {
   star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L12 16.9l-5.3 2.7 1-5.8-4.2-4.1 5.9-.9z"/>',
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
   moon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
-  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>',
   chart: '<path d="M5 20V11M11 20V5M17 20v-7M3 20h18"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
@@ -1473,6 +1473,44 @@ function pickOneContact() {
     toast(res.isNew ? res.p.name + ' ajouté. Choisissez son cercle et son numéro WhatsApp.' : res.p.name + ' existait déjà : numéros complétés.');
   }).catch(function (e) { var m = errMsg(e); if (/cancel/i.test(m)) return; toast("Impossible d'ouvrir le répertoire. (" + m + ')'); });
 }
+var GC_SCOPE = 'https://www.googleapis.com/auth/contacts.readonly';
+function startGoogleContacts() {
+  if (!sb) { toast("Disponible dans l'app Android et sur bestsupport.mrdnej.com."); return; }
+  if (typeof navigator.onLine === 'boolean' && !navigator.onLine) { toast('Connectez-vous à internet pour lire vos contacts Google.'); return; }
+  try { localStorage.setItem('bs-gc', String(Date.now())); } catch (e) { }
+  var opts = { scopes: GC_SCOPE, queryParams: { prompt: 'consent', include_granted_scopes: 'true' } };
+  if (N) {
+    opts.redirectTo = 'ci.mrdnej.bestsupport://login-callback'; opts.skipBrowserRedirect = true;
+    sb.auth.signInWithOAuth({ provider: 'google', options: opts }).then(function (r) { if (r.error) throw r.error; return N.Browser.open({ url: r.data.url, presentationStyle: 'popover' }); }).catch(function (e) { toast('Connexion à Google impossible. (' + errMsg(e) + ')'); });
+  } else {
+    opts.redirectTo = location.origin + location.pathname;
+    sb.auth.signInWithOAuth({ provider: 'google', options: opts }).then(function (r) { if (r.error) toast('Connexion à Google impossible. (' + r.error.message + ')'); });
+  }
+}
+function gcPending() { try { var t = Number(localStorage.getItem('bs-gc') || 0); return t && Date.now() - t < 15 * 60000; } catch (e) { return false; } }
+function loadGoogleContacts(token) {
+  try { localStorage.removeItem('bs-gc'); } catch (e) { }
+  ui = { gcLoading: 1 }; F = {}; stack = [{ name: 'people', p: {} }]; view = { name: 'importContacts', p: {} }; render();
+  var all = [], page = function (tok) {
+    var u = 'https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,birthdays&pageSize=1000&sortOrder=FIRST_NAME_ASCENDING' + (tok ? '&pageToken=' + encodeURIComponent(tok) : '');
+    return fetch(u, { headers: { Authorization: 'Bearer ' + token } }).then(function (r) { if (!r.ok) return r.json().then(function (j) { throw new Error((j.error && j.error.message) || ('HTTP ' + r.status)); }); return r.json(); }).then(function (j) {
+      (j.connections || []).forEach(function (c) {
+        var nm = c.names && c.names[0] ? c.names[0].displayName : '';
+        var ph = (c.phoneNumbers || []).map(function (x) { return { n: x.value, label: 'appel' }; });
+        var b = (c.birthdays || []).map(function (x) { return x.date; }).filter(function (d) { return d && d.month && d.day; })[0];
+        if (nm || ph.length) all.push({ id: 'g' + String(c.resourceName || all.length).replace(/[^a-z0-9]/gi, ''), name: nm || ph[0].n, phones: ph, bday: b ? '2000-' + pad(b.month) + '-' + pad(b.day) : '' });
+      });
+      if (j.nextPageToken && all.length < 5000) return page(j.nextPageToken);
+    });
+  };
+  page('').then(function () {
+    ui.gcLoading = 0; ui.pc = all.sort(function (a, b) { return a.name.localeCompare(b.name); }); ui.sel = {}; ui.cerr = all.length ? '' : 'Aucun contact trouvé dans votre compte Google.'; render();
+  }).catch(function (e) {
+    ui.gcLoading = 0; var m = errMsg(e);
+    ui.cerr = /not been used|disabled/i.test(m) ? "L'accès aux contacts Google n'est pas encore activé (People API). Edmond doit l'activer dans Google Cloud." : /insufficient|scope|permission/i.test(m) ? "Google n'a pas donné l'accès aux contacts. Réessayez et cochez la case « Voir vos contacts »." : 'Lecture des contacts Google impossible. (' + m + ')';
+    render();
+  });
+}
 function qpDecode(v) { try { return decodeURIComponent(v.replace(/=\r?\n/g, '').replace(/%/g, '%25').replace(/=([0-9A-F]{2})/gi, '%$1')); } catch (e) { return v; } }
 function parseVcf(text) {
   var cards = [], cur = null;
@@ -1496,15 +1534,28 @@ function parseVcf(text) {
   });
   return cards.map(function (c, i) { if (!c.name && c.phones[0]) c.name = c.phones[0].n; c.id = 'v' + i; return c; });
 }
+function isKnownContact(c) { return c.phones.some(function (x) { return personByNumber(x.n); }) || S.people.some(function (p) { return p.name.toLowerCase().trim() === String(c.name || '').toLowerCase().trim(); }); }
+function filteredContacts() {
+  var q = (ui.cq || '').toLowerCase().trim(), qd = q.replace(/\D/g, '');
+  return (ui.pc || []).filter(function (c) {
+    if (!q) return true;
+    if (c.name.toLowerCase().indexOf(q) >= 0) return true;
+    return qd.length >= 3 && c.phones.some(function (x) { return String(x.n).replace(/\D/g, '').indexOf(qd) >= 0; });
+  });
+}
 function contactList() {
-  var q = (ui.cq || '').toLowerCase().trim();
-  var xs = (ui.pc || []).filter(function (c) { return !q || c.name.toLowerCase().indexOf(q) >= 0; }).slice(0, 400);
-  if (!xs.length) return '<p class="small muted">Aucun contact trouvé.</p>';
-  return '<div class="list">' + xs.map(function (c) {
+  var all = filteredContacts(), fresh = all.filter(function (c) { return !isKnownContact(c); }), known = all.filter(isKnownContact);
+  if (!all.length) return '<p class="small muted">Aucun contact ne correspond à « ' + esc(ui.cq || '') + ' ».</p>';
+  var row = function (c, dis) {
     var id = 'pc-' + String(c.id).replace(/[^a-z0-9]/gi, '');
-    var known = c.phones.some(function (x) { return personByNumber(x.n); });
-    return '<label class="li" for="' + id + '" style="cursor:pointer"><input type="checkbox" id="' + id + '" data-pick="' + esc(c.id) + '"' + (ui.sel[c.id] ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--green-2);flex:none;margin:0"><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(c.name) + (known ? ' <span class="badge b-lo">Déjà là</span>' : '') + '</span><span class="sub">' + esc([c.phones.map(function (x) { return x.n; }).join(', '), c.bday ? 'anniv. ' + fmtDM(c.bday) : ''].filter(Boolean).join(' · ')) + '</span></span></label>';
-  }).join('') + '</div>';
+    return '<label class="li" for="' + id + '" style="cursor:' + (dis ? 'default' : 'pointer') + (dis ? ';opacity:.6' : '') + '"><input type="checkbox" id="' + id + '" data-pick="' + esc(c.id) + '"' + (ui.sel[c.id] && !dis ? ' checked' : '') + (dis ? ' disabled' : '') + ' style="width:22px;height:22px;accent-color:var(--green-2);flex:none;margin:0"><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(c.name) + (dis ? ' <span class="badge b-lo">Déjà enregistré</span>' : '') + '</span><span class="sub">' + esc([c.phones.map(function (x) { return x.n; }).join(', '), c.bday ? 'anniv. ' + fmtDM(c.bday) : ''].filter(Boolean).join(' · ')) + '</span></span></label>';
+  };
+  var h = '';
+  if (fresh.length) h += '<div class="row between" style="flex-wrap:wrap;gap:6px"><span class="small muted">' + plural(fresh.length, 'contact') + ' à ajouter' + (known.length ? ' · ' + known.length + ' déjà enregistré' + (known.length > 1 ? 's' : '') : '') + '</span><span class="row" style="gap:4px"><button type="button" class="btn-link" style="min-height:36px" data-act="selAll" data-v="1">Tout cocher</button><button type="button" class="btn-link" style="min-height:36px" data-act="selAll" data-v="0">Tout décocher</button></span></div>' +
+    '<div class="list">' + fresh.slice(0, 400).map(function (c) { return row(c, false); }).join('') + '</div>';
+  else h += '<p class="small muted">Tous ces contacts sont déjà dans vos proches.</p>';
+  if (known.length) h += '<details style="margin-top:4px"><summary class="small muted" style="cursor:pointer;min-height:36px;display:flex;align-items:center">Voir les ' + known.length + ' déjà enregistrés</summary><div class="list" style="margin-top:6px">' + known.slice(0, 200).map(function (c) { return row(c, true); }).join('') + '</div></details>';
+  return h;
 }
 function selCount() { return Object.keys(ui.sel || {}).filter(function (k) { return ui.sel[k]; }).length; }
 function V_importContacts() {
@@ -1514,7 +1565,9 @@ function V_importContacts() {
     h += '<button type="button" class="btn btn-dark btn-block" data-act="pickContact">' + ic('user', 18) + ' Choisir un contact</button>';
     h += '<button type="button" class="btn btn-ghost btn-block" data-act="loadContacts">' + ic('users', 18) + ' Afficher tous mes contacts</button>';
   }
+  if (sb) h += '<button type="button" class="btn btn-ghost btn-block" data-act="googleContacts">' + googleG() + ' Importer mes contacts Google</button>';
   h += '<label class="btn btn-ghost btn-block" for="vcfFile" style="cursor:pointer">' + ic('upload', 18) + ' Importer un fichier de contacts (.vcf)</label><input type="file" id="vcfFile" accept=".vcf,text/vcard,text/x-vcard" hidden></div>';
+  if (ui.gcLoading) h += '<p class="muted">Lecture de vos contacts Google…</p>';
   if (!ui.pc) {
     h += '<div class="note">' + ic('info', 18) + '<span>' + (N ? '« Choisir un contact » ouvre votre répertoire : touchez un nom, il est ajouté avec tous ses numéros.' : 'Sur iPhone : dans l\'app Contacts, ouvrez un contact, « Partager le contact », « Enregistrer dans Fichiers », puis importez le fichier ici. Pour tous vos contacts : iCloud.com, Contacts, tout sélectionner, « Exporter une vCard ».') + '</span></div>';
   }
@@ -1522,8 +1575,8 @@ function V_importContacts() {
   if (ui.cerr) h += '<div class="note o">' + ic('info', 18) + '<span>' + esc(ui.cerr) + '</span></div>';
   if (ui.pc) {
     h += '<p class="muted">' + plural(ui.pc.length, 'contact') + '. Cochez vos proches : tous leurs numéros et anniversaires viennent avec.</p>';
+    h += '<div style="position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding-block:8px;margin-block:-8px" class="stack"><div class="field"><label for="cq">Rechercher un nom ou un numéro</label><div class="row" style="gap:8px"><input class="in grow" id="cq" type="search" value="' + esc(ui.cq || '') + '" placeholder="Ex. Awa, 0707…" autocomplete="off" style="flex:1"><span class="badge b-hi" style="font-size:13px" aria-live="polite"><span id="ccount2">' + selCount() + '</span> choisi(s)</span></div></div></div>';
     h += '<div class="field"><label for="i-circle">Cercle pour les contacts choisis</label><select class="in" id="i-circle" data-f="icircle">' + circleOptions(F.icircle || 'amis') + '</select></div>';
-    h += '<div class="field"><label for="cq">Rechercher</label><input class="in" id="cq" type="search" value="' + esc(ui.cq || '') + '" placeholder="Nom" autocomplete="off"></div>';
     h += '<div id="clist">' + contactList() + '</div>';
     h += '<div style="position:sticky;bottom:calc(84px + env(safe-area-inset-bottom,0px))"><button type="button" class="btn btn-dark btn-block" data-act="importContacts">Importer <span id="ccount">' + selCount() + '</span> contact(s)</button></div>';
   }
@@ -1767,6 +1820,7 @@ function initSync() {
   sb.auth.onAuthStateChange(function (ev, session) {
     var u = session && session.user ? session.user : null, was = sbUser && sbUser.id;
     sbUser = u;
+    if (session && session.provider_token && gcPending() && (ev === 'SIGNED_IN' || ev === 'INITIAL_SESSION')) { var tk = session.provider_token; setTimeout(function () { loadGoogleContacts(tk); }, 50); }
     if (u && was !== u.id && ev === 'SIGNED_IN') onLogin();
     else if (u && !was) syncNow(false);
     if (!N && /[?&]code=/.test(location.search)) { try { history.replaceState(null, '', location.pathname); } catch (e) { } }
@@ -1863,6 +1917,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.6 bêta', items: ['Importer vos contacts Google directement', 'Les contacts déjà enregistrés ne sont plus importés en double', 'Recherche par nom ou numéro, « Tout cocher » pour l\'import en masse', 'Nouvelle icône Paramètres'] },
   { v: '0.5 bêta', items: ['Connexion avec Google : vos données sauvegardées en ligne et synchronisées entre votre téléphone et votre ordinateur', 'Chaque membre de la famille se connecte avec son propre compte Google'] },
   { v: '0.4 bêta', items: ['Widget Android : votre priorité du jour sur l\'écran d\'accueil', 'Vos retours et signalements arrivent directement à Edmond, même envoyés hors ligne'] },
   { v: '0.3 bêta', items: ['Contacts réparés : « Choisir un contact », import de tout le répertoire ou d\'un fichier .vcf', 'Plusieurs numéros par proche : Appel, WhatsApp, Autre', 'Votre agenda Google importé automatiquement (Android)', 'Saisie vocale : dites « Rappelle-moi de rembourser Koffi 15 000 francs vendredi »', 'Lecture à voix haute de vos priorités', 'Ajout rapide, recherche, partage d\'un rappel, modèles d\'évènements', 'Calendrier du mois, grande police, bouton « Signaler »'] },
@@ -2003,11 +2058,13 @@ var ACT = {
     var ids = Object.keys(ui.sel || {}).filter(function (k) { return ui.sel[k]; });
     if (!ids.length) { toast('Choisissez au moins un contact.'); return; }
     var nNew = 0, nMerged = 0, circle = F.icircle || 'amis';
-    (ui.pc || []).forEach(function (c) { if (!ui.sel[c.id]) return; var r = addOrMergePerson({ name: c.name, phones: c.phones.slice(), bday: c.bday }, circle); if (r.isNew) nNew++; else nMerged++; });
+    (ui.pc || []).forEach(function (c) { if (!ui.sel[c.id] || isKnownContact(c)) return; var r = addOrMergePerson({ name: c.name, phones: c.phones.slice(), bday: c.bday }, circle); if (r.isNew) nNew++; else nMerged++; });
     save(); F = {}; stack = []; tab('people');
     toast(plural(nNew, 'proche importé') + (nMerged ? ', ' + plural(nMerged, 'fiche complétée') : '') + '. Ajustez cercle et numéro WhatsApp dans chaque fiche.');
   },
   pickContact: function () { pickOneContact(); },
+  googleContacts: function () { startGoogleContacts(); },
+  selAll: function (d) { var on = d.v === '1'; filteredContacts().forEach(function (c) { if (!isKnownContact(c)) ui.sel[c.id] = on; }); var cl = document.getElementById('clist'); if (cl) cl.innerHTML = contactList(); ['ccount', 'ccount2'].forEach(function (i) { var e = document.getElementById(i); if (e) e.textContent = selCount(); }); },
   signIn: function () { signIn(); },
   signOut: function () { signOut(); },
   syncNow: function () { syncNow(true); },
@@ -2178,7 +2235,7 @@ document.addEventListener('change', function (e) {
   if (el.id === 's-theme') { S.settings.theme = el.value; F.theme = el.value; applyTheme(); save(); toast(el.value === 'dark' ? 'Thème sombre activé.' : el.value === 'light' ? 'Thème clair activé.' : 'Le thème suit maintenant votre téléphone.'); return; }
   if (el.id === 's-zoom') { S.settings.zoom = Number(el.value); F.zoom = el.value; applyTheme(); save(); return; }
   if (el.id === 's-mh') { S.settings.morningHour = Number(el.value); save(); render(); return; }
-  if (el.dataset && el.dataset.pick != null) { ui.sel[el.dataset.pick] = el.checked; var cc = document.getElementById('ccount'); if (cc) cc.textContent = selCount(); return; }
+  if (el.dataset && el.dataset.pick != null) { ui.sel[el.dataset.pick] = el.checked; var cc = document.getElementById('ccount'); if (cc) cc.textContent = selCount(); var cc2 = document.getElementById('ccount2'); if (cc2) cc2.textContent = selCount(); return; }
   if (el.id === 'importFile' && el.files && el.files[0]) {
     var r = new FileReader(); r.onload = function () { ui.pending = String(r.result); ui.importOk = '1'; render(); }; r.readAsText(el.files[0]); return;
   }

@@ -1,6 +1,6 @@
 {
-  "build": 7,
-  "version": "0.5.1 bêta",
+  "build": 8,
+  "version": "0.6 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Thème sombre appliqué tout de suite."
+  "notes": "Contacts Google, pas de doublons, recherche par numéro."
 }
