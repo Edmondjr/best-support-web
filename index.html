@@ -14,7 +14,6 @@
 @font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:800;font-display:swap;src:url(fonts/plus-jakarta-sans-latin-800-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:800;font-display:swap;src:url(fonts/plus-jakarta-sans-latin-ext-800-normal.woff2) format('woff2')}
 :root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
-<script>window.BS_BUILD=0;</script>
 <meta name="theme-color" content="#0B3D2E">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -232,7 +231,9 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.3 bêta';
+var VERSION = '0.4 bêta';
+var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
+var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
 var UPDATE_URL = 'https://bestsupport.mrdnej.com/version.json';
 var N = (window.BSNative && window.BSNative.isNative) ? window.BSNative : null;
@@ -617,7 +618,16 @@ function notify(title, body) {
 }
 /* Notifications Android : programmées dans le système, même app fermée */
 var schedTimer = null;
-function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(scheduleNative, 1200); }
+function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(function () { scheduleNative(); updateWidget(); }, 1200); }
+function updateWidget() {
+  if (!N || !N.Widget) return;
+  try {
+    var pr = priorities(), top = pr.list[0];
+    var payload = top ? { label: pr.rest ? 'Jour de repos' : 'Priorité du jour', title: top.title, sub: top.kind === 'person' ? top.p.name + ' · ' + top.sub : top.sub, score: String(top.score), more: pr.list.length > 1 ? '+' + (pr.list.length - 1) + ' autre' + (pr.list.length > 2 ? 's' : '') : '' }
+      : { label: pr.rest ? 'Jour de repos' : 'Priorité du jour', title: S.people.length ? 'Rien d\'urgent' : 'Ajoutez vos proches', sub: S.people.length ? 'Appelez quelqu\'un que vous aimez.' : 'Ouvrez Best Support pour commencer.', score: '', more: '' };
+    N.Widget.update(payload).catch(function () { });
+  } catch (e) { }
+}
 function hashId(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return (Math.abs(h) % 2000000000) + 1; }
 function atTime(ds, h, m) { var d = parse(ds); d.setHours(h, m || 0, 0, 0); return d; }
 function buildSchedule() {
@@ -685,7 +695,7 @@ function initNative() {
   N.App.addListener('appStateChange', function (st) {
     if (!st.isActive) { hiddenAt = Date.now(); return; }
     if (lockOn() && Date.now() - hiddenAt > 60000) locked = true;
-    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); render();
+    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); render();
   });
   N.App.addListener('backButton', function () { if (locked) { N.App.minimizeApp(); return; } if (stack.length) { F = {}; back(); } else if (view.name !== 'home' && S.settings.onboarded) tab('home'); else N.App.minimizeApp(); });
   syncCalls();
@@ -1275,7 +1285,7 @@ function V_about() {
         var txt = 'Best Support ' + VERSION + ' · ' + (f.kind === 'probleme' ? 'Problème' : 'Suggestion') + (f.stars ? ' · ' + f.stars + '/5' : '') + '\n' + f.msg + '\n(' + S.tester.name + ', ' + (S.tester.city || '') + ')';
         return '<div class="card" style="box-shadow:none;background:var(--surface-2);gap:8px"><div class="row between"><span class="tiny" style="font-weight:800">' + (f.kind === 'probleme' ? 'Problème' : 'Suggestion') + ' · ' + esc(fmtDM(f.date)) + '</span>' + (f.stars ? '<span class="tiny muted">' + f.stars + '/5</span>' : '') + '</div><p class="small">' + esc(f.msg) + '</p>' +
           '<a class="btn btn-ghost" style="min-height:42px" href="' + esc(S.settings.support ? waLink(S.settings.support, txt) : 'https://wa.me/?text=' + encodeURIComponent(txt)) + '" target="_blank" rel="noopener">' + ic('send', 16) + ' Envoyer via WhatsApp</a></div>';
-      }).join('') + '</div><p class="tiny muted">Vos retours restent sur ce téléphone tant que vous ne les envoyez pas.</p>';
+      }).join('') + '</div><p class="tiny muted">Vos retours sont envoyés automatiquement à Edmond dès que vous avez internet.</p>';
     }
   }
   h += '</section>';
@@ -1664,6 +1674,33 @@ function searchResults() {
   return rows.length ? '<div class="list">' + rows.slice(0, 60).join('') + '</div>' : '<p class="small muted">Aucun résultat pour « ' + esc(ui.gq) + ' ».</p>';
 }
 
+/* Envoi des retours vers la base Best Support (file d'attente hors ligne) */
+function platformName() { if (N) return 'android'; if (/iphone|ipad|ipod/i.test(navigator.userAgent)) return 'iphone'; if (/android|mobile/i.test(navigator.userAgent)) return 'web'; return 'ordinateur'; }
+function queueFeedback(f) {
+  S.outbox = S.outbox || [];
+  S.outbox.push({ fid: f.id, kind: f.kind, message: String(f.msg || '').slice(0, 4000), screen: f.screen || null, stars: f.stars || null, app_version: VERSION + (BUILD ? ' (' + BUILD + ')' : ''), platform: platformName(), tester_email: S.tester && /@/.test(S.tester.contact || '') ? S.tester.contact : null, tester_name: (S.tester && S.tester.name) || S.settings.name || null });
+  save(); flushOutbox();
+}
+var flushing = false;
+function flushOutbox() {
+  if (flushing || !(S.outbox || []).length) return;
+  if (typeof navigator.onLine === 'boolean' && !navigator.onLine) return;
+  flushing = true;
+  var batch = S.outbox.slice(0, 20);
+  var body = batch.map(function (x) { var o = Object.assign({}, x); delete o.fid; return o; });
+  fetch(SB_URL + '/rest/v1/feedback', { method: 'POST', headers: { 'apikey': SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }, body: JSON.stringify(body) })
+    .then(function (r) {
+      flushing = false;
+      if (!r.ok) return;
+      var ids = batch.map(function (x) { return x.fid; });
+      S.outbox = S.outbox.slice(batch.length);
+      S.feedback.forEach(function (f) { if (ids.indexOf(f.id) >= 0) f.sent = true; });
+      save(); if (view.name === 'report' || view.name === 'about') render();
+      if (S.outbox.length) flushOutbox();
+    }).catch(function () { flushing = false; });
+}
+window.addEventListener('online', flushOutbox);
+
 /* Signaler un problème ou une idée */
 var SCREEN_NAMES = { home: 'Accueil', people: 'Mes proches', person: 'Fiche proche', agenda: 'Agenda', item: 'Détail', itemForm: 'Ajouter', personForm: 'Fiche proche (modifier)', plus: 'Plus', bilan: 'Bilan', routines: 'Routines', routine: 'Routine', about: 'À propos', settings: 'Paramètres', tontines: 'Tontines', tontine: 'Tontine', gifts: 'Registre des dons', messages: 'Messages prêts', importContacts: 'Contacts', calendars: 'Agenda Google', search: 'Recherche' };
 function V_report(p0) {
@@ -1675,12 +1712,17 @@ function V_report(p0) {
     '<div class="field"><label for="r-msg">' + (F.rkind === 'idee' ? 'Votre idée' : 'Ce qui s\'est passé') + '</label><textarea class="in" id="r-msg" data-f="rmsg" placeholder="' + (F.rkind === 'idee' ? 'Ce qui vous aiderait…' : 'Ce que vous faisiez, ce qui ne marche pas…') + '">' + esc(F.rmsg) + '</textarea></div>' +
     (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '') +
     '<button type="submit" class="btn btn-dark btn-block">Enregistrer</button></form>';
-  if (ui.sentTxt) h += '<section class="card"><p class="small">Enregistré. Envoyez-le maintenant pour qu\'il nous parvienne :</p><a class="btn btn-green" href="' + esc(S.settings.support ? waLink(S.settings.support, ui.sentTxt) : 'https://wa.me/?text=' + encodeURIComponent(ui.sentTxt)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' Envoyer via WhatsApp</a></section>';
+  if (ui.sentTxt) {
+    var lf = S.feedback.filter(function (f) { return f.id === ui.lastFid; })[0];
+    h += '<div class="note">' + ic('checkc', 18) + '<span>' + (lf && lf.sent ? 'Envoyé. Merci, Edmond le lira.' : 'Enregistré. Il sera envoyé automatiquement dès que vous aurez internet.') + '</span></div>' +
+      '<a class="btn btn-ghost" href="' + esc(S.settings.support ? waLink(S.settings.support, ui.sentTxt) : 'https://wa.me/?text=' + encodeURIComponent(ui.sentTxt)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' Envoyer aussi par WhatsApp (facultatif)</a>';
+  }
   return h + '</div>';
 }
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.4 bêta', items: ['Widget Android : votre priorité du jour sur l\'écran d\'accueil', 'Vos retours et signalements arrivent directement à Edmond, même envoyés hors ligne'] },
   { v: '0.3 bêta', items: ['Contacts réparés : « Choisir un contact », import de tout le répertoire ou d\'un fichier .vcf', 'Plusieurs numéros par proche : Appel, WhatsApp, Autre', 'Votre agenda Google importé automatiquement (Android)', 'Saisie vocale : dites « Rappelle-moi de rembourser Koffi 15 000 francs vendredi »', 'Lecture à voix haute de vos priorités', 'Ajout rapide, recherche, partage d\'un rappel, modèles d\'évènements', 'Calendrier du mois, grande police, bouton « Signaler »'] },
   { v: '0.2 bêta', items: ['Application Android : rappels même app fermée', 'Tontines, registre des dons, remboursements partiels', 'Verrouillage, messages prêts, engagements récurrents'] }
 ];
@@ -1958,18 +2000,20 @@ var SUBMIT = {
   report: function () {
     var m = (F.rmsg || '').trim(); if (!m) { ui.err = 'Écrivez quelques mots.'; render(); return; }
     var scr = SCREEN_NAMES[view.p.screen] || view.p.screen || '';
-    S.feedback.push({ id: uid(), kind: F.rkind === 'idee' ? 'suggestion' : 'probleme', msg: m, screen: scr, date: today(), version: VERSION + (BUILD ? ' (' + BUILD + ')' : '') }); save();
+    var fb = { id: uid(), kind: F.rkind === 'idee' ? 'suggestion' : 'probleme', msg: m, screen: scr, date: today(), version: VERSION + (BUILD ? ' (' + BUILD + ')' : '') };
+    S.feedback.push(fb); queueFeedback(fb); ui.lastFid = fb.id;
     ui.sentTxt = 'Best Support ' + VERSION + (BUILD ? ' build ' + BUILD : '') + ' · ' + (F.rkind === 'idee' ? 'Idée' : 'Problème') + ' · écran ' + scr + '\n' + m + (S.tester ? '\n(' + S.tester.name + ')' : '');
     F = { _init: 1, rkind: F.rkind, rmsg: '' }; ui.err = ''; render(); toast('Merci pour votre retour.');
   },
   survey: function () {
     if (!F.s1) { ui.err = 'Donnez une note à la première question.'; render(); return; }
-    S.feedback.push({ id: uid(), kind: 'questionnaire', msg: 'Note : ' + F.s1 + '/5 · Fonction préférée : ' + (F.s2 || '?') + ' · Manque : ' + (F.s3 || '').trim(), stars: F.s1, date: today() });
+    var sv = { id: uid(), kind: 'questionnaire', msg: 'Note : ' + F.s1 + '/5 · Fonction préférée : ' + (F.s2 || '?') + ' · Manque : ' + (F.s3 || '').trim(), stars: F.s1, date: today() };
+    S.feedback.push(sv); queueFeedback(sv);
     S.settings.surveyDone = true; save(); F = {}; stack = []; tab('home'); toast('Merci beaucoup pour vos réponses.');
   },
   feedback: function () {
     var m = (F.fmsg || '').trim(); if (!m) { ui.err = 'Écrivez votre message.'; render(); return; }
-    S.feedback.push({ id: uid(), kind: F.fkind || 'suggestion', msg: m, stars: F.fstars || 0, date: today() }); save(); F = {}; ui = {}; render(); toast('Merci. Envoyez-le via WhatsApp pour qu\'il nous parvienne.');
+    var fbb = { id: uid(), kind: F.fkind || 'suggestion', msg: m, stars: F.fstars || 0, date: today() }; S.feedback.push(fbb); queueFeedback(fbb); F = {}; ui = {}; render(); toast('Merci pour votre retour. Il est envoyé automatiquement.');
   }
 };
 
@@ -2020,7 +2064,8 @@ document.addEventListener('visibilitychange', function () { if (N) return; if (d
 render();
 checkReminders();
 initNative();
-if (N) { syncCalendar(false); checkUpdate(false); }
+if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
+flushOutbox();
 
 // exposé pour les tests
 window.__BS = { parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };

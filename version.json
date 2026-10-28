@@ -1,6 +1,6 @@
 {
-  "build": 3,
-  "version": "0.3 bêta",
+  "build": 5,
+  "version": "0.4 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Contacts réparés, numéros multiples, agenda Google, saisie vocale, recherche, calendrier mois."
+  "notes": "Widget Android et retours envoyés directement."
 }
