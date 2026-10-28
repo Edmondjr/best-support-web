@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.7 bêta';
+var VERSION = '0.8 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -338,7 +338,7 @@ function defaultRoutine() {
   return { id: 'culte', title: 'Culte du dimanche', day: 0, time: '09:00', on: true, checklist: ['Tenue repassée', 'Bible', 'Offrande', 'Transport prévu'] };
 }
 function fresh() {
-  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
+  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: false, asrModel: 'base', lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
 }
 function load() {
   try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); var f = fresh(); for (var k in f) if (s[k] == null) s[k] = f[k]; for (var k2 in f.settings) if (s.settings[k2] == null) s.settings[k2] = f.settings[k2]; (s.people || []).forEach(function (p) { if (!p.phones) p.phones = p.phone ? [{ n: p.phone, label: 'appel' }] : []; }); return s; } } catch (e) { }
@@ -633,7 +633,7 @@ function notify(title, body) {
 }
 /* Notifications Android : programmées dans le système, même app fermée */
 var schedTimer = null;
-function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(function () { scheduleNative(); updateWidget(); }, 1200); }
+function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(function () { scheduleNative(); updateWidget(); pushCallPeople(); }, 1200); }
 function updateWidget() {
   if (!N || !N.Widget) return;
   try {
@@ -710,7 +710,7 @@ function initNative() {
   N.App.addListener('appStateChange', function (st) {
     if (!st.isActive) { hiddenAt = Date.now(); return; }
     if (lockOn() && Date.now() - hiddenAt > 60000) locked = true;
-    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); render();
+    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); handleShared(); render();
   });
   N.App.addListener('backButton', function () { if (locked) { N.App.minimizeApp(); return; } if (stack.length) { F = {}; back(); } else if (view.name !== 'home' && S.settings.onboarded) tab('home'); else N.App.minimizeApp(); });
   syncCalls();
@@ -807,7 +807,7 @@ function loadDemo() {
 function clearDemo() { S.people = []; S.items = []; S.contacts = []; S.tontines = []; S.gifts = []; S.checks = {}; S.snooze = {}; S.demo = false; }
 
 /* ---------- Navigation ---------- */
-var TAB_OF = { cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
+var TAB_OF = { audio: 'people', cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
 function go(name, p, replace) {
   if (!replace) stack.push(view);
   view = { name: name, p: p || {} }; ui = {};
@@ -1017,6 +1017,7 @@ function V_person(p0) {
     '<button type="button" class="act" data-act="go" data-to="itemForm" data-person="' + p.id + '"><span class="c">' + ic('plus') + '</span>Engagement</button></div>' +
     (phonesOf(p).length ? '<div class="stack" style="gap:2px">' + phonesOf(p).map(function (x) { return '<p class="tiny muted">' + esc(PHONE_LABELS[x.label] || 'Autre') + ' : <span style="user-select:all;color:var(--fg);font-weight:700">' + esc(x.n) + '</span></p>'; }).join('') + '</div>' : '') + '</div>';
 
+  h += '<button type="button" class="btn btn-ghost btn-block" data-act="go" data-to="audio" data-pid="' + p.id + '">' + ic('mic', 18) + ' Analyser un appel avec ' + esc(p.name) + '</button>';
   h += '<div class="grid2"><button type="button" class="btn btn-ghost" data-act="go" data-to="messages" data-id="' + p.id + '">' + ic('chat', 18) + ' Messages prêts</button><button type="button" class="btn btn-ghost" data-act="go" data-to="giftForm" data-person="' + p.id + '">' + ic('heart', 18) + ' Noter un don</button></div>';
   h += '<section class="card"><div class="row between"><h2 class="h2">Score de priorité</h2><span class="badge b-' + lv.k + '" style="font-size:15px">' + s.score + ' / 100</span></div><div class="bars">' +
     bar('Urgence' + (s.best && s.U > 0 ? ' · ' + s.best.label.toLowerCase() : ''), s.U, '0,45', 'var(--orange)') +
@@ -1210,7 +1211,7 @@ function V_personForm(p0) {
 }
 
 function V_plus() {
-  var rows = [['bilan', 'chart', 'Bilan de la semaine', 'Votre semaine en quelques mots'], ['tontines', 'coins', 'Tontines', 'Cotisations, tours et rappels'], ['cotis', 'heart', 'Cotisations', 'Mariages, funérailles, baptêmes : qui a cotisé'], ['join', 'users', 'Rejoindre un groupe', 'Avec le code reçu d\'un proche'], ['gifts', 'star', 'Registre des dons', 'Ce que vous avez reçu et donné'], ['routines', 'shirt', 'Routines de veille', 'Préparer le dimanche et les cérémonies'], ['importContacts', 'users', 'Ajouter mes contacts', 'Répertoire du téléphone ou fichier .vcf'], ['calendars', 'calendar', 'Mon agenda Google', 'Importer vos évènements'], ['news', 'sparkle', 'Nouveautés', 'Ce qui a changé'], ['report', 'flag', 'Signaler un problème ou une idée', 'Aidez-nous à améliorer l\'app'], ['about', 'info', 'À propos et testeurs', 'Une initiative #MrDNEJ, vos suggestions'], ['settings', 'gear', 'Paramètres', 'Prénom, repos, rappels, sauvegarde']];
+  var rows = [['bilan', 'chart', 'Bilan de la semaine', 'Votre semaine en quelques mots'], ['tontines', 'coins', 'Tontines', 'Cotisations, tours et rappels'], ['cotis', 'heart', 'Cotisations', 'Mariages, funérailles, baptêmes : qui a cotisé'], ['join', 'users', 'Rejoindre un groupe', 'Avec le code reçu d\'un proche'], ['gifts', 'star', 'Registre des dons', 'Ce que vous avez reçu et donné'], ['routines', 'shirt', 'Routines de veille', 'Préparer le dimanche et les cérémonies'], ['audio', 'mic', 'Analyser un appel', 'Enregistrement ou note vocale : tâches détectées'], ['importContacts', 'users', 'Ajouter mes contacts', 'Répertoire du téléphone ou fichier .vcf'], ['calendars', 'calendar', 'Mon agenda Google', 'Importer vos évènements'], ['news', 'sparkle', 'Nouveautés', 'Ce qui a changé'], ['report', 'flag', 'Signaler un problème ou une idée', 'Aidez-nous à améliorer l\'app'], ['about', 'info', 'À propos et testeurs', 'Une initiative #MrDNEJ, vos suggestions'], ['settings', 'gear', 'Paramètres', 'Prénom, repos, rappels, sauvegarde']];
   var h = '<div class="screen"><h1 class="h1">Plus</h1><div class="list">' + rows.map(function (r) { return '<button type="button" class="li" data-act="go" data-to="' + r[0] + '"><span class="av">' + ic(r[1]) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + r[2] + '</span><span class="sub">' + r[3] + '</span></span>' + ic('chev', 18) + '</button>'; }).join('') + '</div>';
   h += accountCard() + installCard() + notifCard();
   return h + '</div>';
@@ -1331,7 +1332,9 @@ function V_settings() {
     '<div class="field"><label for="s-mh">Heure du point du matin</label><select class="in" id="s-mh" data-f="morningHour">' + [5, 6, 7, 8, 9].map(function (x) { return '<option value="' + x + '"' + (Number(F.morningHour || S.settings.morningHour || 7) === x ? ' selected' : '') + '>' + x + ' h</option>'; }).join('') + '</select></div>' + '</section>';
   if (N) h += '<section class="card"><h2 class="h2">Contact noté automatiquement</h2><p class="small muted">Quand vous appelez un proche (appel décroché), son dernier contact se met à jour tout seul. Rien ne quitte votre téléphone.</p>' +
     switchRow('Utiliser mon journal d\'appels', !!S.settings.callSync, 'callSyncToggle', '', 'callSync') +
+    switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') +
     (S.settings.callSync ? '<button type="button" class="btn btn-ghost" data-act="syncCallsNow">Vérifier maintenant</button>' : '') + '</section>';
+  h += '<section class="card"><h2 class="h2">Transcription des appels</h2><p class="small muted">Le modèle tourne sur votre appareil. « Précis » reconnaît mieux le français mais est plus lourd et plus lent.</p><div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="Modèle">' + Object.keys(ASR_MODELS).map(function (k) { return '<button type="button" aria-pressed="' + ((S.settings.asrModel || 'base') === k) + '" data-act="setAsr" data-v="' + k + '">' + ASR_MODELS[k].label + ' (' + ASR_MODELS[k].size + ')</button>'; }).join('') + '</div></section>';
   h += '<form class="card" data-form="lockset" novalidate><h2 class="h2">Verrouillage</h2><p class="small muted">Protégez vos dettes et vos notes privées.</p>' +
     '<div class="field"><label for="s-lock">Mode</label><select class="in" id="s-lock" data-f="lock" data-rerender="1">' + [['none', 'Aucun'], ['pin', 'Code PIN']].concat(N ? [['bio', 'Empreinte (avec code de secours)']] : []).map(function (x) { var cur = F.lock != null ? F.lock : (S.settings.lock || 'none'); return '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     ((F.lock != null ? F.lock : S.settings.lock || 'none') !== 'none' ? '<div class="grid2"><div class="field"><label for="s-pin1">' + (S.settings.pinHash ? 'Nouveau code (facultatif)' : 'Code (4 à 6 chiffres)') + '</label><input class="in" id="s-pin1" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin1" value="' + esc(F.pin1 || '') + '"></div><div class="field"><label for="s-pin2">Confirmer</label><input class="in" id="s-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin2" value="' + esc(F.pin2 || '') + '"></div></div>' : '') +
@@ -1672,24 +1675,26 @@ function parseSpeech(text) {
   // personne
   var p = matchPersonInText(raw); if (p) r.personId = p.id;
   // type
-  if (/rembours|dette|\bdoit\b|\bdois\b|prete|emprunt|recuperer|argent/.test(t) && r.amount) {
+  if (/rembours|dette|\bdoit\b|\bdois\b|prete|emprunt|recuperer|argent|\brend\b|rendre/.test(t) && r.amount) {
     r.type = 'dette'; r.dir = /me doit|m'a emprunte|lui ai prete|recuperer|me rembourse|me rend/.test(t) ? 'on_me_doit' : 'je_dois';
   } else if (/mariage|funerailles|obseques|enterrement|bapteme|anniversaire|reunion|ceremonie|fete|messe|culte|\bdot\b|voyage|veillee|rendez-vous|rdv/.test(t)) {
     r.type = 'evenement'; r.checklistTxt = templateFor(t).join('\n');
   } else if (/promis|envoyer|appeler|passer voir|rendre|apporter|donner/.test(t)) r.type = 'engagement';
   // titre
-  var title = raw.replace(/^(rappelle[- ]moi( de| d')?|rappelle[- ]moi que|note( que)?|il faut que je|je dois|n'oublie pas( de| d')?|penser a|pense a)\s*/i, '');
+  var title = raw.replace(/^((bon|alors|donc|ok|okay|euh|ah|et puis|ensuite|aussi|et)[\s,]+)+/i, '').replace(/^(rappelle[- ]moi( de| d')?|rappelle[- ]moi que|note( que)?|il faut que je|je dois|n'oublie pas( de| d')?|penser a|pense a)\s*/i, '');
   cut.forEach(function (c) { var rx = c instanceof RegExp ? new RegExp(c.source, 'i') : null; if (rx) { var nf = title.normalize('NFD').replace(/[̀-ͯ]/g, ''); var mm = nf.match(rx); if (mm) title = title.slice(0, mm.index) + title.slice(mm.index + mm[0].length); } else { var idx = title.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().indexOf(c); if (idx >= 0) title = title.slice(0, idx) + title.slice(idx + c.length); } });
-  title = title.replace(/\s+(le|la|les|à|a|de|du|pour|ce|cette)\s*$/i, '').replace(/\s{2,}/g, ' ').replace(/^[\s,.]+|[\s,.]+$/g, '');
+  for (var k = 0; k < 3; k++) title = title.replace(/[\s,.!?…]+$/g, '').replace(/\s+(le|la|les|l'|à|a|de|d'|du|des|pour|ce|cette|et|avec)$/i, '');
+  title = title.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').replace(/^[\s,.]+|[\s,.]+$/g, '');
   r.title = title ? title.charAt(0).toUpperCase() + title.slice(1) : raw;
   if (!r.due) r.due = addDays(td, 1);
   return r;
 }
 function voiceAvailableWeb() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
-function startVoice() {
+function startVoice(presetPid) {
   var done = function (text) {
     if (!text) { toast("Je n'ai rien entendu. Réessayez."); return; }
     var r = parseSpeech(text);
+    if (presetPid && !r.personId) r.personId = presetPid;
     F = Object.assign({ _init: 1, place: '', notes: '', remindEve: true, remindDay: true, recur: '' }, r, { heard: text });
     stack.push(view); view = { name: 'itemForm', p: {} }; ui = {}; render(); window.scrollTo(0, 0);
   };
@@ -1732,6 +1737,132 @@ function briefText() {
   return s;
 }
 
+/* Engagements dans un texte (appel transcrit, note vocale, note écrite) */
+var CUE_ACTION = /(\brend\b|rendre|je (vais|te|vous|lui|t'|dois|passe|rembourse|envoie|appelle|rappelle|apporte|donne|paie|paye|viens)|on (se voit|va|fait|se retrouve|se parle)|n'oublie pas|il faut|rendez-vous|\brdv\b|tu (me|vas|dois|peux)|vous (me|allez|devez|pouvez)|rembours|envoy|apport|cotis|tontine|pr[eê]t|doit|dette|mariage|fun[eé]railles|bapt[eê]me|\bdot\b|anniversaire|r[eé]union|passer)/i;
+var CUE_WHEN = /(aujourd'?hui|ce soir|demain|apr[eè]s[- ]demain|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|semaine prochaine|dans \w+ (jours?|semaines?|mois)|\ble \d{1,2}\b|\d{1,2} ?h|francs?|fcfa|\bmille\b|\d{3,})/i;
+function extractCommitments(text, pid) {
+  if (!pid) { var guess = matchPersonInText(String(text || '')); if (guess) pid = guess.id; }
+  var sentences = String(text || '').replace(/\s+/g, ' ').split(/(?<=[.!?…])\s+|\s+(?:et puis|ensuite|aussi|par contre)\s+/i).map(function (x) { return x.trim(); }).filter(function (x) { return x.length > 8; });
+  var out = [], seen = {};
+  sentences.forEach(function (snt) {
+    if (!CUE_ACTION.test(snt) || !CUE_WHEN.test(snt)) return;
+    var r = parseSpeech(snt);
+    if (!r.personId && pid) r.personId = pid;
+    var key = r.type + '|' + r.title.toLowerCase().slice(0, 40) + '|' + r.due;
+    if (seen[key]) return; seen[key] = 1;
+    r.source = snt; out.push(r);
+  });
+  return out.slice(0, 12);
+}
+
+/* Lecture d'un fichier audio : décodage puis passage en 16 kHz mono pour Whisper */
+function decodeAudioBlob(blob) {
+  return blob.arrayBuffer().then(function (buf) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = new AC();
+    return new Promise(function (res, rej) { ctx.decodeAudioData(buf.slice(0), res, rej); }).then(function (decoded) {
+      try { ctx.close(); } catch (e) { }
+      var frames = Math.ceil(decoded.duration * 16000);
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      var off = new OAC(1, frames, 16000);
+      var src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start(0);
+      return off.startRendering().then(function (rendered) { return { pcm: rendered.getChannelData(0), seconds: decoded.duration }; });
+    });
+  });
+}
+var ASR_MODELS = { base: { id: 'onnx-community/whisper-base', label: 'Rapide', size: 'environ 80 Mo' }, small: { id: 'onnx-community/whisper-small', label: 'Précis', size: 'environ 250 Mo' } };
+var asrWorker = null;
+function runTranscription(blob, name) {
+  ui.au = { stage: 'decode', name: name || 'audio', pct: 0, text: '', props: null, err: '' }; render();
+  decodeAudioBlob(blob).then(function (d) {
+    if (d.seconds > 45 * 60) throw new Error('Fichier trop long (plus de 45 minutes).');
+    ui.au.seconds = d.seconds; ui.au.stage = 'model'; render();
+    if (!asrWorker) asrWorker = new Worker('asr-worker.js', { type: 'module' });
+    asrWorker.onmessage = function (ev) {
+      var m = ev.data || {}, a = ui.au; if (!a) return;
+      if (m.type === 'download') { a.stage = 'download'; a.dl = m.total ? Math.round(m.loaded / m.total * 100) : 0; a.dlMb = Math.round(m.total / 1048576); }
+      else if (m.type === 'status') a.stage = 'model';
+      else if (m.type === 'progress') { a.stage = 'transcribe'; a.pct = Math.round(m.done / m.total * 100); a.text = m.text; }
+      else if (m.type === 'done') { a.stage = 'done'; a.text = m.text; a.props = extractCommitments(m.text, ui.auPid || ''); a.pick = a.props.map(function () { return true; }); }
+      else if (m.type === 'error') { a.stage = 'error'; a.err = /fetch|network|Failed to fetch/i.test(m.message) ? 'Le modèle de transcription doit être téléchargé une première fois : connectez-vous à internet (de préférence en Wi-Fi) puis réessayez.' : 'Transcription impossible. (' + m.message + ')'; }
+      var box = document.getElementById('aubox'); if (box && view.name === 'audio') box.innerHTML = audioBox(); else render();
+    };
+    var model = (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.base).id;
+    asrWorker.postMessage({ type: 'transcribe', model: model, audio: d.pcm }, [d.pcm.buffer]);
+  }).catch(function (e) {
+    ui.au.stage = 'error'; ui.au.err = /decode|EncodingError|Unable/i.test(errMsg(e)) ? "Ce format audio n'est pas lu par cet appareil. Essayez un fichier .m4a, .mp3 ou .wav, ou la note vocale WhatsApp depuis un téléphone Android." : errMsg(e); render();
+  });
+}
+function audioBox() {
+  var a = ui.au; if (!a) return '';
+  var mins = a.seconds ? Math.max(1, Math.round(a.seconds / 60)) : 0;
+  if (a.stage === 'error') return '<div class="note o">' + ic('info', 18) + '<span>' + esc(a.err) + '</span></div>';
+  if (a.stage !== 'done') {
+    var lbl = a.stage === 'decode' ? 'Lecture du fichier…' : a.stage === 'download' ? 'Téléchargement du modèle de transcription (une seule fois' + (a.dlMb ? ', ' + a.dlMb + ' Mo' : '') + ') : ' + (a.dl || 0) + ' %' : a.stage === 'model' ? 'Préparation de la transcription…' : 'Transcription sur votre appareil : ' + a.pct + ' %';
+    var pc = a.stage === 'download' ? (a.dl || 0) : a.stage === 'transcribe' ? a.pct : 5;
+    return '<section class="card"><div class="ttl">' + esc(a.name) + (mins ? ' · ' + mins + ' min' : '') + '</div><p class="small">' + esc(lbl) + '</p><div class="bar"><i style="width:' + Math.max(3, pc) + '%;background:var(--green-2)"></i></div>' +
+      (a.text ? '<p class="small muted" style="max-height:120px;overflow:auto">' + esc(a.text) + '</p>' : '') + '<p class="tiny muted">Rien ne quitte votre appareil. Comptez environ la durée de l\'enregistrement.</p></section>';
+  }
+  var h = '';
+  if (a.props.length) {
+    h += '<section class="stack"><h2 class="h2">' + plural(a.props.length, 'engagement détecté') + '</h2><p class="small muted">Décochez ce qui ne convient pas, touchez « Modifier » pour corriger.</p><div class="list">' + a.props.map(function (r, i) {
+      var pp = r.personId ? person(r.personId) : null;
+      return '<div class="li" style="align-items:flex-start"><input type="checkbox" id="ap' + i + '" data-apick="' + i + '"' + (a.pick[i] ? ' checked' : '') + ' style="width:22px;height:22px;accent-color:var(--green-2);flex:none;margin:4px 0 0"><label for="ap' + i + '" class="grow stack" style="gap:2px;cursor:pointer"><span class="ttl">' + esc(r.title) + '</span><span class="sub" style="white-space:normal">' + esc([TYPES[r.type].label, pp ? pp.name : '', r.amount ? money(r.amount) : '', r.due ? fmt(r.due) : '', r.time].filter(Boolean).join(' · ')) + '</span><span class="tiny muted" style="font-style:italic">« ' + esc(r.source.slice(0, 140)) + ' »</span></label><button type="button" class="btn-link" style="min-height:36px" data-act="auEdit" data-i="' + i + '">Modifier</button></div>';
+    }).join('') + '</div><button type="button" class="btn btn-dark btn-block" data-act="auAdd">Ajouter les éléments cochés</button></section>';
+  } else h += '<div class="note">' + ic('info', 18) + '<span>Aucun engagement clair détecté. Relisez la transcription : vous pouvez dicter ou écrire une note vous-même.</span></div>';
+  h += '<details><summary class="small" style="cursor:pointer;min-height:40px;display:flex;align-items:center;font-weight:700">Voir la transcription</summary><p class="small" style="white-space:pre-wrap;line-height:1.6">' + esc(a.text || '(vide)') + '</p></details>';
+  h += '<p class="tiny muted">La transcription et l\'audio ne sont pas conservés. Seuls les éléments que vous ajoutez sont enregistrés.</p>';
+  return h;
+}
+function V_audio(p0) {
+  if (p0.pid && !ui.auPid) ui.auPid = p0.pid;
+  var h = '<div class="screen">' + head('Analyser un appel');
+  h += '<p class="muted">Choisissez un enregistrement d\'appel ou une note vocale WhatsApp. Best Support le transcrit sur votre appareil et repère les promesses, rendez-vous et dettes.</p>';
+  h += '<div class="field"><label for="au-person">Avec qui ?</label><select class="in" id="au-person" data-aupid="1"><option value="">Je ne sais pas / plusieurs personnes</option>' + S.people.slice().sort(function (a, b) { return a.name.localeCompare(b.name); }).map(function (pp) { return '<option value="' + pp.id + '"' + (ui.auPid === pp.id ? ' selected' : '') + '>' + esc(pp.name) + '</option>'; }).join('') + '</select></div>';
+  if (!ui.au || ui.au.stage === 'done' || ui.au.stage === 'error') h += '<label class="btn btn-dark btn-block" for="audioFile" style="cursor:pointer">' + ic('upload', 18) + ' Choisir un fichier audio</label><input type="file" id="audioFile" accept="audio/*,.m4a,.mp3,.wav,.ogg,.opus,.aac,.amr,.3gp" hidden>';
+  h += '<div id="aubox" class="stack" style="gap:14px">' + audioBox() + '</div>';
+  if (!ui.au) {
+    h += '<div class="note">' + ic('info', 18) + '<span>' + (N ? 'Astuce : dans WhatsApp ou votre app d\'enregistrement, touchez « Partager » puis Best Support : le fichier arrive ici directement.' : 'Sur iPhone : enregistrez la note vocale dans Fichiers (Partager, Enregistrer dans Fichiers), puis choisissez-la ici.') + '</span></div>';
+    h += '<div class="note o">' + ic('info', 18) + '<span>Pensez à prévenir la personne avant d\'enregistrer une conversation. La première analyse télécharge un modèle de transcription (' + (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.base).size + ') : faites-la en Wi-Fi.</span></div>';
+  }
+  return h + '</div>';
+}
+
+/* Juste après un appel (Android) */
+function V_afterCall(p0) {
+  var pp = person(p0.pid);
+  var name = pp ? pp.name : (p0.n || 'votre proche'), mins = p0.d ? Math.max(1, Math.round(Number(p0.d) / 60)) : 0;
+  var h = '<div class="screen nonav"><div class="row between"><button type="button" class="iconbtn" data-act="tab" data-to="home" aria-label="Fermer">' + ic('x') + '</button><span></span></div>';
+  h += '<section class="card" style="align-items:center;text-align:center;gap:10px"><div class="av lg">' + esc(initials(name)) + '</div><h1 class="h2">Appel avec ' + esc(name) + ' terminé</h1><p class="muted">' + (mins ? mins + ' min. ' : '') + 'Quelque chose à noter ? Une promesse, un rendez-vous, une dette…</p>' +
+    '<button type="button" class="btn btn-dark btn-block" data-act="voiceFor" data-pid="' + esc(p0.pid || '') + '">' + ic('mic', 18) + ' Dicter</button></section>';
+  h += '<form class="stack" style="gap:10px" data-form="quicknote" novalidate><div class="field"><label for="qn">Ou écrivez</label><textarea class="in" id="qn" data-f="qn" placeholder="Ex. Il me rend les 15 000 vendredi. On se voit samedi à 10h pour la dot.">' + esc(F.qn || '') + '</textarea></div><button type="submit" class="btn btn-ghost btn-block">Analyser ma note</button></form>';
+  if (ui.qprops) {
+    h += ui.qprops.length ? '<div class="list">' + ui.qprops.map(function (r, i) { return '<div class="li"><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(r.title) + '</span><span class="sub">' + esc([TYPES[r.type].label, r.amount ? money(r.amount) : '', r.due ? fmt(r.due) : '', r.time].filter(Boolean).join(' · ')) + '</span></span><button type="button" class="btn btn-green" style="min-height:40px" data-act="qnAdd" data-i="' + i + '">Ajouter</button></div>'; }).join('') + '</div>' : '<p class="small muted">Aucune date ou montant trouvé. Ajoutez par exemple « vendredi » ou « 15 000 francs ».</p>';
+  }
+  if (pp) h += '<a class="btn btn-link" href="#" data-act="go" data-to="audio" data-pid="' + pp.id + '">Analyser l\'enregistrement de cet appel</a>';
+  h += '<button type="button" class="btn btn-ghost btn-block" data-act="nothingToNote" data-pid="' + esc(p0.pid || '') + '">Rien à noter</button>';
+  return h + '</div>';
+}
+function pushCallPeople() {
+  if (!N || !N.CallNotes) return;
+  var arr = [];
+  S.people.forEach(function (pp) { phonesOf(pp).forEach(function (x) { var k = numKey(x.n); if (k.length === 8) arr.push({ k: k, id: pp.id, name: pp.name }); }); });
+  N.CallNotes.setPeople({ people: arr }).catch(function () { });
+}
+function handleShared() {
+  if (!N || !N.CallNotes) return;
+  N.CallNotes.consumeShared().then(function (r) {
+    if (!r || !r.has) return;
+    var url = window.Capacitor && window.Capacitor.convertFileSrc ? window.Capacitor.convertFileSrc('file://' + r.path) : r.path;
+    fetch(url).then(function (res) { return res.blob(); }).then(function (blob) {
+      var guess = matchPersonInText(r.name.replace(/[_.-]+/g, ' ')) || personByNumber((r.name.match(/\+?\d[\d ]{7,}/) || [''])[0]);
+      locked = locked && lockOn();
+      F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'audio', p: {} }; ui = { auPid: guess ? guess.id : '' }; render(); window.scrollTo(0, 0);
+      runTranscription(blob, r.name);
+    }).catch(function (e) { toast('Impossible de lire le fichier partagé. (' + errMsg(e) + ')'); });
+  }).catch(function () { });
+}
+
 /* Recherche globale */
 function V_search() {
   var h = '<div class="screen">' + head('Rechercher');
@@ -1751,7 +1882,7 @@ function searchResults() {
 /* Compte Google et synchronisation entre appareils */
 var sb = null, sbUser = null, syncBusy = false, syncErr = '', syncTimer = null;
 var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts', 'cotis'];
-var LOCAL_SETTINGS = ['lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
+var LOCAL_SETTINGS = ['afterCall', 'asrModel', 'lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
 function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h; }
 function syncRecords() {
   var out = {};
@@ -1999,6 +2130,11 @@ function initSync() {
     render();
   });
   if (N && N.App) N.App.addListener('appUrlOpen', function (ev) {
+    if (ev && ev.url && ev.url.indexOf('after-call') >= 0) {
+      var q = {}; (ev.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); });
+      F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: { pid: q.pid || '', n: q.n || '', d: q.d || '' } }; ui = {}; render(); window.scrollTo(0, 0);
+      return;
+    }
     if (!ev || !ev.url || ev.url.indexOf('login-callback') < 0) return;
     try { N.Browser.close(); } catch (e) { }
     var m = ev.url.match(/[?&#]code=([^&#]+)/), er = ev.url.match(/[?&#]error_description=([^&#]+)/);
@@ -2089,6 +2225,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.8 bêta', items: ['Après un appel avec un proche (Android) : une notification vous propose de noter une promesse, un rendez-vous ou une dette', 'Analyser un appel : enregistrement ou note vocale WhatsApp transcrit sur votre appareil, engagements détectés à valider', 'Partagez un fichier audio vers Best Support depuis WhatsApp ou votre enregistreur'] },
   { v: '0.7 bêta', items: ['Mode famille : partagez une tontine ou une cotisation avec un code, chacun voit qui a payé', 'Nouveau module Cotisations : mariages, funérailles, baptêmes, dot', 'Rejoindre un groupe avec le code reçu d\'un proche', 'Liens Confidentialité et Conditions dans À propos'] },
   { v: '0.6 bêta', items: ['Importer vos contacts Google directement', 'Les contacts déjà enregistrés ne sont plus importés en double', 'Recherche par nom ou numéro, « Tout cocher » pour l\'import en masse', 'Nouvelle icône Paramètres'] },
   { v: '0.5 bêta', items: ['Connexion avec Google : vos données sauvegardées en ligne et synchronisées entre votre téléphone et votre ordinateur', 'Chaque membre de la famille se connecte avec son propre compte Google'] },
@@ -2138,7 +2275,7 @@ function V_lock() {
     (N && S.settings.lock === 'bio' ? '<button type="button" class="btn btn-ghost btn-block" data-act="bio">Utiliser l\'empreinte</button>' : '') + '</form></div>';
 }
 
-var VIEWS = { cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
+var VIEWS = { audio: V_audio, afterCall: V_afterCall, cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
 function navHtml() {
   var cur = TAB_OF[view.name] || '';
   var b = function (id, icon, label) { return '<button type="button" data-act="tab" data-to="' + id + '"' + (cur === id ? ' aria-current="page"' : '') + '>' + ic(icon, 22) + label + '</button>'; };
@@ -2154,6 +2291,9 @@ function render() {
 }
 
 /* ---------- Actions ---------- */
+function addFromProposal(r) {
+  S.items.push({ id: uid(), type: r.type, title: r.title, personId: r.personId || '', amount: r.type === 'dette' ? (Number(r.amount) || '') : '', dir: r.dir || 'je_dois', due: r.due || '', time: r.time || '', place: '', notes: r.source ? 'Extrait : « ' + r.source.slice(0, 300) + ' »' : '', checklist: r.type === 'evenement' ? String(r.checklistTxt || '').split('\n').filter(Boolean) : [], remindEve: true, remindDay: true, recur: '', done: false, created: today() });
+}
 function markContact(p) { S.contacts.push({ id: uid(), personId: p.id, date: today(), how: 'contact' }); p.last = today(); }
 function openKey(key) {
   var a = key.split(':'); F = {};
@@ -2188,7 +2328,7 @@ var ACT = {
     if (N) ACT.askNotif();
     if (d.import) go('importContacts');
   },
-  go: function (d) { F = {}; var p = {}; if (d.id) p.id = d.id; if (d.person) p.person = d.person; if (d.type) p.type = d.type; go(d.to, p); },
+  go: function (d) { F = {}; var p = {}; if (d.pid) p.pid = d.pid; if (d.id) p.id = d.id; if (d.person) p.person = d.person; if (d.type) p.type = d.type; go(d.to, p); },
   tab: function (d) { F = {}; tab(d.to); if (d.tab) { ui.tab = d.tab; render(); } },
   back: function () { F = {}; back(); },
   ui: function (d) { ui[d.k] = d.v; if (d.k !== 'err') ui.err = ''; render(); },
@@ -2239,6 +2379,20 @@ var ACT = {
   },
   pickContact: function () { pickOneContact(); },
   googleContacts: function () { startGoogleContacts(); },
+  setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
+  voiceFor: function (d) { startVoice(d.pid || ''); },
+  nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
+  qnAdd: function (d) { var r = ui.qprops[Number(d.i)]; addFromProposal(r); ui.qprops.splice(Number(d.i), 1); save(); render(); toast('Ajouté : ' + r.title + '.'); },
+  auEdit: function (d) { var r = ui.au.props[Number(d.i)]; F = Object.assign({ _init: 1, place: '', notes: 'Extrait : « ' + r.source + ' »', remindEve: true, remindDay: true, recur: '', checklistTxt: '' }, r); stack.push(view); view = { name: 'itemForm', p: {} }; render(); window.scrollTo(0, 0); },
+  auAdd: function () { var a = ui.au, n = 0; a.props.forEach(function (r, i) { if (a.pick[i]) { addFromProposal(r); n++; } }); if (ui.auPid) { var pp = person(ui.auPid); if (pp) markContact(pp); } save(); ui.au = null; render(); toast(n ? plural(n, 'élément ajouté') + ' à votre agenda.' : 'Rien n\'a été ajouté.'); },
+  afterCallToggle: function () {
+    if (!N || !N.CallNotes) return;
+    if (S.settings.afterCall) { S.settings.afterCall = false; N.CallNotes.setEnabled({ on: false }); save(); render(); return; }
+    N.CallNotes.requestAccess().then(function (r) {
+      if (!r.granted) { toast("Autorisez l'accès au téléphone et au journal d'appels pour cette fonction."); return; }
+      S.settings.afterCall = true; N.CallNotes.setEnabled({ on: true }); pushCallPeople(); save(); render(); toast('Activé : après chaque appel avec un proche, Best Support vous proposera une note.');
+    }).catch(function (e) { toast('Activation impossible. (' + errMsg(e) + ')'); });
+  },
   shareGroup: function (d) { var o = d.kind === 'tontine' ? tontine(d.id) : coti(d.id); if (o) shareGroup(o, d.kind); },
   leaveGroup: function (d) { var o = d.kind === 'tontine' ? tontine(d.id) : coti(d.id); if (o) leaveGroup(o); },
   iAm: function (d) {
@@ -2323,6 +2477,7 @@ var ACT = {
   resetAll: function () { var snap = snapshot(); if (sb && sbUser) { try { sb.auth.signOut(); } catch (e) { } sbUser = null; } S = fresh(); save(); applyTheme(); F = {}; stack = []; view = { name: 'splash', p: {} }; ui = {}; render(); toast('Toutes les données ont été effacées.', snap); }
 };
 var SUBMIT = {
+  quicknote: function () { var t = (F.qn || '').trim(); if (!t) return; var props = extractCommitments(t, view.p.pid || ''); if (!props.length) { var r = parseSpeech(t); if (!r.personId && view.p.pid) r.personId = view.p.pid; r.source = t; props = [r]; } ui.qprops = props; render(); },
   coti: function () {
     var name = (F.name || '').trim(); if (!name) { ui.err = 'Indiquez pour quoi est la cotisation.'; render(); return; }
     var lines = String(F.partsTxt || '').split('\n').map(function (x) { return x.trim(); }).filter(Boolean);
@@ -2437,6 +2592,9 @@ document.addEventListener('change', function (e) {
   if (el.id === 'vcfFile' && el.files && el.files[0]) {
     var fr = new FileReader(); fr.onload = function () { var cards = parseVcf(String(fr.result)); if (!cards.length) { ui.cerr = 'Aucun contact trouvé dans ce fichier.'; render(); return; } if (cards.length === 1) { var r1 = addOrMergePerson(cards[0], 'amis'); save(); F = {}; go('personForm', { id: r1.p.id, after: 'people' }); toast(r1.isNew ? r1.p.name + ' ajouté.' : r1.p.name + ' complété.'); return; } ui.pc = cards.sort(function (a, b) { return a.name.localeCompare(b.name); }); ui.sel = {}; ui.cerr = ''; render(); }; fr.readAsText(el.files[0]); return;
   }
+  if (el.id === 'audioFile' && el.files && el.files[0]) { var fl = el.files[0]; runTranscription(fl, fl.name); return; }
+  if (el.dataset && el.dataset.aupid) { ui.auPid = el.value; if (ui.au && ui.au.props) ui.au.props.forEach(function (r) { if (!r._pidSet) r.personId = r.personId || el.value; }); return; }
+  if (el.dataset && el.dataset.apick != null) { ui.au.pick[Number(el.dataset.apick)] = el.checked; return; }
   if (el.id === 's-theme') { S.settings.theme = el.value; F.theme = el.value; applyTheme(); save(); toast(el.value === 'dark' ? 'Thème sombre activé.' : el.value === 'light' ? 'Thème clair activé.' : 'Le thème suit maintenant votre téléphone.'); return; }
   if (el.id === 's-zoom') { S.settings.zoom = Number(el.value); F.zoom = el.value; applyTheme(); save(); return; }
   if (el.id === 's-mh') { S.settings.morningHour = Number(el.value); save(); render(); return; }
@@ -2474,6 +2632,11 @@ render();
 checkReminders();
 initNative();
 initSync();
+if (N) {
+  window.addEventListener('bsShared', handleShared);
+  handleShared();
+  if (N.App.getLaunchUrl) N.App.getLaunchUrl().then(function (r) { if (r && r.url && r.url.indexOf('after-call') >= 0) { var q = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); }); stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: q }; render(); } }).catch(function () { });
+}
 setInterval(function () { if (sbUser && !document.hidden) syncNow(false); }, 120000);
 if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
 flushOutbox();

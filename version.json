@@ -1,6 +1,6 @@
 {
-  "build": 10,
-  "version": "0.7 bêta",
+  "build": 11,
+  "version": "0.8 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Mode famille : tontines et cotisations partagées."
+  "notes": "Note après un appel et analyse d'enregistrement d'appel (transcription sur votre téléphone)."
 }

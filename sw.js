@@ -1,6 +1,6 @@
 // Best Support : service worker
 // Réseau d'abord (toujours la dernière version si internet), copie locale si hors ligne.
-var CACHE = 'bestsupport-v0.7';
+var CACHE = 'bestsupport-v0.8';
 var SHELL = ['./', './index.html', './sb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
   './fonts/plus-jakarta-sans-latin-400-normal.woff2', './fonts/plus-jakarta-sans-latin-600-normal.woff2', './fonts/plus-jakarta-sans-latin-700-normal.woff2', './fonts/plus-jakarta-sans-latin-800-normal.woff2'];
 
