@@ -1,6 +1,8 @@
-// Best Support : service worker (cache hors ligne + clic sur notification)
-var CACHE = 'bestsupport-v0.6';
-var SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png', './sb.js', './fonts/plus-jakarta-sans-latin-400-normal.woff2', './fonts/plus-jakarta-sans-latin-600-normal.woff2', './fonts/plus-jakarta-sans-latin-700-normal.woff2', './fonts/plus-jakarta-sans-latin-800-normal.woff2'];
+// Best Support : service worker
+// Réseau d'abord (toujours la dernière version si internet), copie locale si hors ligne.
+var CACHE = 'bestsupport-v0.6.1';
+var SHELL = ['./', './index.html', './sb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
+  './fonts/plus-jakarta-sans-latin-400-normal.woff2', './fonts/plus-jakarta-sans-latin-600-normal.woff2', './fonts/plus-jakarta-sans-latin-700-normal.woff2', './fonts/plus-jakarta-sans-latin-800-normal.woff2'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -11,15 +13,21 @@ self.addEventListener('activate', function (e) {
   }).then(function () { return self.clients.claim(); }));
 });
 self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request).then(function (hit) {
-    var net = fetch(e.request).then(function (res) {
-      if (res && res.ok && new URL(e.request.url).origin === location.origin) {
-        var copy = res.clone(); caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
-      }
-      return res;
-    }).catch(function () { return hit || caches.match('./index.html'); });
-    return hit || net;
+  var req = e.request;
+  if (req.method !== 'GET') return;
+  var url = new URL(req.url);
+  if (url.origin !== location.origin) return; // Google, Supabase : jamais mis en cache
+  if (url.pathname.indexOf('/downloads/') === 0 || url.pathname === '/version.json') return;
+  var isFont = url.pathname.indexOf('/fonts/') === 0 || /\.(png|woff2)$/.test(url.pathname);
+  if (isFont) {
+    e.respondWith(caches.match(req).then(function (hit) { return hit || fetch(req).then(function (res) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, cp); }); return res; }); }));
+    return;
+  }
+  e.respondWith(fetch(req).then(function (res) {
+    if (res && res.ok) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(req, cp); }); }
+    return res;
+  }).catch(function () {
+    return caches.match(req).then(function (hit) { return hit || (req.mode === 'navigate' ? caches.match('./index.html') : Response.error()); });
   }));
 });
 self.addEventListener('notificationclick', function (e) {
