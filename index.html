@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.5 bêta';
+var VERSION = '0.5.1 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -1305,7 +1305,7 @@ function V_settings() {
     '<div class="grid2"><div class="field"><label for="s-rest">Jour de repos</label><select class="in" id="s-rest" data-f="restDay">' + dayOptions(F.restDay) + '</select></div>' +
     '<div class="field"><label for="s-eve">Rappel de la veille</label><select class="in" id="s-eve" data-f="eveHour">' + [17, 18, 19, 20, 21, 22].map(function (x) { return '<option value="' + x + '"' + (Number(F.eveHour) === x ? ' selected' : '') + '>' + x + ' h</option>'; }).join('') + '</select></div></div>' +
     '<div class="field"><label for="s-zoom">Taille du texte</label><select class="in" id="s-zoom" data-f="zoom">' + [['1', 'Normale'], ['1.12', 'Grande'], ['1.25', 'Très grande']].map(function (x) { return '<option value="' + x[0] + '"' + (String(F.zoom || S.settings.zoom || 1) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
-    '<div class="field"><label for="s-theme">Apparence</label><select class="in" id="s-theme" data-f="theme"><option value=""' + (!F.theme ? ' selected' : '') + '>Comme le téléphone</option><option value="light"' + (F.theme === 'light' ? ' selected' : '') + '>Clair</option><option value="dark"' + (F.theme === 'dark' ? ' selected' : '') + '>Sombre</option></select></div>' +
+    '<div class="field"><label for="s-theme">Apparence</label><select class="in" id="s-theme" data-f="theme"><option value=""' + (!F.theme ? ' selected' : '') + '>Comme le téléphone (automatique)</option><option value="light"' + (F.theme === 'light' ? ' selected' : '') + '>Clair</option><option value="dark"' + (F.theme === 'dark' ? ' selected' : '') + '>Sombre</option></select></div>' +
     '<div class="field"><label for="s-support">Numéro WhatsApp qui reçoit les retours testeurs (facultatif)</label><input class="in" id="s-support" data-f="support" type="tel" value="' + esc(F.support) + '" placeholder="07 00 00 00 00"></div>' +
     '<button type="submit" class="btn btn-dark btn-block">Enregistrer</button></form>';
   h += notifCard();
@@ -1680,7 +1680,7 @@ function searchResults() {
 /* Compte Google et synchronisation entre appareils */
 var sb = null, sbUser = null, syncBusy = false, syncErr = '', syncTimer = null;
 var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts'];
-var LOCAL_SETTINGS = ['lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom'];
+var LOCAL_SETTINGS = ['lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
 function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h; }
 function syncRecords() {
   var out = {};
@@ -2175,6 +2175,8 @@ document.addEventListener('change', function (e) {
   if (el.id === 'vcfFile' && el.files && el.files[0]) {
     var fr = new FileReader(); fr.onload = function () { var cards = parseVcf(String(fr.result)); if (!cards.length) { ui.cerr = 'Aucun contact trouvé dans ce fichier.'; render(); return; } if (cards.length === 1) { var r1 = addOrMergePerson(cards[0], 'amis'); save(); F = {}; go('personForm', { id: r1.p.id, after: 'people' }); toast(r1.isNew ? r1.p.name + ' ajouté.' : r1.p.name + ' complété.'); return; } ui.pc = cards.sort(function (a, b) { return a.name.localeCompare(b.name); }); ui.sel = {}; ui.cerr = ''; render(); }; fr.readAsText(el.files[0]); return;
   }
+  if (el.id === 's-theme') { S.settings.theme = el.value; F.theme = el.value; applyTheme(); save(); toast(el.value === 'dark' ? 'Thème sombre activé.' : el.value === 'light' ? 'Thème clair activé.' : 'Le thème suit maintenant votre téléphone.'); return; }
+  if (el.id === 's-zoom') { S.settings.zoom = Number(el.value); F.zoom = el.value; applyTheme(); save(); return; }
   if (el.id === 's-mh') { S.settings.morningHour = Number(el.value); save(); render(); return; }
   if (el.dataset && el.dataset.pick != null) { ui.sel[el.dataset.pick] = el.checked; var cc = document.getElementById('ccount'); if (cc) cc.textContent = selCount(); return; }
   if (el.id === 'importFile' && el.files && el.files[0]) {

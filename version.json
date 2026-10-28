@@ -1,6 +1,6 @@
 {
-  "build": 6,
-  "version": "0.5 bêta",
+  "build": 7,
+  "version": "0.5.1 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Connexion Google et synchronisation entre appareils."
+  "notes": "Thème sombre appliqué tout de suite."
 }
