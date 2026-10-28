@@ -1,6 +1,6 @@
 {
-  "build": 11,
-  "version": "0.8 bêta",
+  "build": 13,
+  "version": "0.8.1 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Note après un appel et analyse d'enregistrement d'appel (transcription sur votre téléphone)."
+  "notes": "Note après appel activée d'office, meilleure voix française, transcription Précis."
 }

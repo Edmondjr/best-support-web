@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.8 bêta';
+var VERSION = '0.8.1 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -338,7 +338,7 @@ function defaultRoutine() {
   return { id: 'culte', title: 'Culte du dimanche', day: 0, time: '09:00', on: true, checklist: ['Tenue repassée', 'Bible', 'Offrande', 'Transport prévu'] };
 }
 function fresh() {
-  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: false, asrModel: 'base', lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
+  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: true, asrModel: 'small', voice: '', voiceRate: 0.95, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
 }
 function load() {
   try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); var f = fresh(); for (var k in f) if (s[k] == null) s[k] = f[k]; for (var k2 in f.settings) if (s.settings[k2] == null) s.settings[k2] = f.settings[k2]; (s.people || []).forEach(function (p) { if (!p.phones) p.phones = p.phone ? [{ n: p.phone, label: 'appel' }] : []; }); return s; } } catch (e) { }
@@ -633,7 +633,7 @@ function notify(title, body) {
 }
 /* Notifications Android : programmées dans le système, même app fermée */
 var schedTimer = null;
-function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(function () { scheduleNative(); updateWidget(); pushCallPeople(); }, 1200); }
+function scheduleSoon() { if (!N) return; clearTimeout(schedTimer); schedTimer = setTimeout(function () { scheduleNative(); updateWidget(); pushCallPeople(); autoAfterCall(); }, 1200); }
 function updateWidget() {
   if (!N || !N.Widget) return;
   try {
@@ -1334,7 +1334,14 @@ function V_settings() {
     switchRow('Utiliser mon journal d\'appels', !!S.settings.callSync, 'callSyncToggle', '', 'callSync') +
     switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') +
     (S.settings.callSync ? '<button type="button" class="btn btn-ghost" data-act="syncCallsNow">Vérifier maintenant</button>' : '') + '</section>';
-  h += '<section class="card"><h2 class="h2">Transcription des appels</h2><p class="small muted">Le modèle tourne sur votre appareil. « Précis » reconnaît mieux le français mais est plus lourd et plus lent.</p><div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="Modèle">' + Object.keys(ASR_MODELS).map(function (k) { return '<button type="button" aria-pressed="' + ((S.settings.asrModel || 'base') === k) + '" data-act="setAsr" data-v="' + k + '">' + ASR_MODELS[k].label + ' (' + ASR_MODELS[k].size + ')</button>'; }).join('') + '</div></section>';
+  if (!VOICE_LIST && !ui.voicesLoading) { ui.voicesLoading = 1; loadVoices().then(function () { if (view.name === 'settings') render(); }); }
+  var vl = VOICE_LIST || [], cur = pickVoice(vl), hasQ = vl.some(function (v) { return v.q >= 50; });
+  h += '<section class="card"><h2 class="h2">Lecture à voix haute</h2><p class="small muted">Best Support choisit la meilleure voix française de votre appareil. Vous pouvez en essayer d\'autres.</p>' +
+    '<div class="field"><label for="s-voice">Voix</label><select class="in" id="s-voice">' + (vl.length ? vl.map(function (v) { return '<option value="' + esc(v.name) + '"' + (cur && cur.name === v.name ? ' selected' : '') + '>' + esc(v.label) + '</option>'; }).join('') : '<option value="">Voix française par défaut</option>') + '</select></div>' +
+    '<div class="field"><label for="s-vrate">Vitesse</label><select class="in" id="s-vrate">' + [['0.85', 'Lente'], ['0.95', 'Normale'], ['1.05', 'Rapide']].map(function (x) { return '<option value="' + x[0] + '"' + (String(S.settings.voiceRate || 0.95) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
+    '<button type="button" class="btn btn-ghost btn-block" data-act="testVoice">' + ic('speaker', 18) + ' Écouter un exemple</button>' +
+    (N && !hasQ ? '<div class="note">' + ic('info', 18) + '<span>Pour une voix plus naturelle, installez les voix françaises « haute qualité » de Google : Paramètres Android, Synthèse vocale, Google, Installer les données vocales, Français.</span></div><button type="button" class="btn btn-link" data-act="installVoices">Ouvrir l\'installation des voix</button>' : '') + '</section>';
+  h += '<section class="card"><h2 class="h2">Transcription des appels</h2><p class="small muted">Le modèle tourne sur votre appareil. « Précis » (recommandé) reconnaît bien mieux le français. Il est plus lourd à télécharger une seule fois, et un peu plus long à transcrire. « Rapide » convient aux téléphones modestes.</p><div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="Modèle">' + Object.keys(ASR_MODELS).map(function (k) { return '<button type="button" aria-pressed="' + ((S.settings.asrModel || 'small') === k) + '" data-act="setAsr" data-v="' + k + '">' + ASR_MODELS[k].label + ' (' + ASR_MODELS[k].size + ')</button>'; }).join('') + '</div></section>';
   h += '<form class="card" data-form="lockset" novalidate><h2 class="h2">Verrouillage</h2><p class="small muted">Protégez vos dettes et vos notes privées.</p>' +
     '<div class="field"><label for="s-lock">Mode</label><select class="in" id="s-lock" data-f="lock" data-rerender="1">' + [['none', 'Aucun'], ['pin', 'Code PIN']].concat(N ? [['bio', 'Empreinte (avec code de secours)']] : []).map(function (x) { var cur = F.lock != null ? F.lock : (S.settings.lock || 'none'); return '<option value="' + x[0] + '"' + (cur === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
     ((F.lock != null ? F.lock : S.settings.lock || 'none') !== 'none' ? '<div class="grid2"><div class="field"><label for="s-pin1">' + (S.settings.pinHash ? 'Nouveau code (facultatif)' : 'Code (4 à 6 chiffres)') + '</label><input class="in" id="s-pin1" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin1" value="' + esc(F.pin1 || '') + '"></div><div class="field"><label for="s-pin2">Confirmer</label><input class="in" id="s-pin2" type="password" inputmode="numeric" maxlength="6" autocomplete="off" data-f="pin2" value="' + esc(F.pin2 || '') + '"></div></div>' : '') +
@@ -1718,14 +1725,67 @@ function startVoice(presetPid) {
     rec.start();
   } catch (e) { toast('Saisie vocale indisponible ici.'); }
 }
-function speak(text) {
-  if (N && N.TextToSpeech) { N.TextToSpeech.stop().catch(function () { }).then(function () { return N.TextToSpeech.speak({ text: text, lang: 'fr-FR', rate: 0.95, pitch: 1.0, volume: 1.0, category: 'playback' }); }).catch(function (e) { toast('Lecture impossible. (' + errMsg(e) + ')'); }); return; }
-  try {
+/* Lecture à voix haute : meilleure voix française disponible + texte réécrit pour être bien prononcé */
+var VOICE_LIST = null;
+function voiceScore(v) {
+  var n = String(v.name || v.voiceURI || ''), l = String(v.lang || '').replace('_', '-');
+  if (!/^fr/i.test(l)) return -1;
+  var sc = /^fr-FR/i.test(l) ? 20 : 10;
+  if (/network|online|natural|neural|premium|enhanced|wavenet|studio|siri/i.test(n)) sc += 30;
+  if (/google/i.test(n)) sc += 8;
+  if (/denise|henri|vivienne|remy|rémy|eloise|audrey|thomas|amelie|amélie|marie|aurelie|aurélie|frd|frb|frc|fre|vlf/i.test(n)) sc += 4;
+  if (/compact|espeak|pico/i.test(n)) sc -= 40;
+  return sc;
+}
+function voiceLabel(v, k) {
+  var n = String(v.name || ''), q = /network|online|natural|neural|premium|enhanced|wavenet|studio|siri/i.test(n);
+  var friendly = n.replace(/^(Microsoft|Google|com\.apple\.[a-z.]+)\s*/i, '').replace(/\s*\(.*\)$/, '').replace(/\s*-\s*(French|Français).*$/i, '');
+  if (/^fr-[a-z]{2}-x-/i.test(n)) friendly = 'Voix ' + (k + 1);
+  return friendly + (/CA/i.test(v.lang) ? ' (Canada)' : /BE/i.test(v.lang) ? ' (Belgique)' : /CH/i.test(v.lang) ? ' (Suisse)' : '') + (q ? ' · haute qualité' : '');
+}
+function loadVoices() {
+  if (VOICE_LIST) return Promise.resolve(VOICE_LIST);
+  var get = (N && N.TextToSpeech && N.TextToSpeech.getSupportedVoices) ? N.TextToSpeech.getSupportedVoices().then(function (r) { return (r && r.voices) || []; }) :
+    new Promise(function (res) { var ss = window.speechSynthesis; if (!ss) return res([]); var v = ss.getVoices(); if (v.length) return res(v); var t = setTimeout(function () { res(ss.getVoices()); }, 1500); ss.onvoiceschanged = function () { clearTimeout(t); res(ss.getVoices()); }; });
+  return get.then(function (arr) {
+    VOICE_LIST = arr.map(function (v, i) { return { i: i, name: v.name || v.voiceURI || ('voix ' + i), lang: v.lang || '', q: voiceScore(v), raw: v }; }).filter(function (v) { return v.q >= 0; }).sort(function (a, b) { return b.q - a.q; });
+    VOICE_LIST.forEach(function (v, k) { v.label = voiceLabel(v, k); });
+    return VOICE_LIST;
+  }).catch(function () { VOICE_LIST = []; return VOICE_LIST; });
+}
+function pickVoice(list) { var want = S.settings.voice; return (want && list.filter(function (v) { return v.name === want; })[0]) || list[0] || null; }
+var WD_FULL = { 'lun': 'lundi', 'mar': 'mardi', 'mer': 'mercredi', 'jeu': 'jeudi', 'ven': 'vendredi', 'sam': 'samedi', 'dim': 'dimanche' };
+var MO_FULL = { 'janv': 'janvier', 'févr': 'février', 'avr': 'avril', 'juil': 'juillet', 'sept': 'septembre', 'oct': 'octobre', 'nov': 'novembre', 'déc': 'décembre' };
+function speechText(t) {
+  t = String(t || '');
+  t = t.replace(/https?:\/\/\S+/g, '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '');
+  t = t.replace(/#MrDNEJ/g, 'Mister D. N. E. J.').replace(/#(\w)/g, '$1');
+  t = t.replace(/(\d)[\s\u00a0\u202f.](?=\d{3}\b)/g, '$1').replace(/(\d)[\s\u00a0\u202f.](?=\d{3}\b)/g, '$1');
+  t = t.replace(/(\d+)\s?(?:F\s?CFA|FCFA|CFA|F)\b/g, '$1 francs');
+  t = t.replace(/\b(\d{1,2})[:h](\d{2})\b/g, function (m, h, mi) { return Number(h) + (Number(h) > 1 ? ' heures' : ' heure') + (mi === '00' ? '' : ' ' + Number(mi)); });
+  t = t.replace(/\b(\d{1,2}) ?h\b/g, function (m, h) { return Number(h) + (Number(h) > 1 ? ' heures' : ' heure'); });
+  t = t.replace(/\b(lun|mar|mer|jeu|ven|sam|dim)\.(?=\s+\d)/g, function (m, d) { return WD_FULL[d]; });
+  t = t.replace(/(\d{1,2}|1er)\s+(janv|févr|avr|juil|sept|oct|nov|déc)\./g, function (m, n, mo) { return n + ' ' + MO_FULL[mo]; });
+  t = t.replace(/\b1er\b/g, 'premier').replace(/\bM\.\s(?=[A-ZÀ-Ý])/g, 'Monsieur ').replace(/\bMme\b\.?/g, 'Madame').replace(/\bMlle\b\.?/g, 'Mademoiselle');
+  t = t.replace(/\brdv\b/gi, 'rendez-vous').replace(/\bsvp\b/gi, "s'il vous plaît").replace(/\btél\.?\s/gi, 'téléphone ').replace(/\bn°\s?/gi, 'numéro ').replace(/\bex\.\s/g, 'par exemple ').replace(/\betc\.?/g, 'et cetera');
+  t = t.replace(/(\d)\s?%/g, '$1 pour cent').replace(/\s&\s/g, ' et ').replace(/\s[·•|\/]\s/g, ', ').replace(/[·•]/g, ', ').replace(/[«»"“”]/g, '').replace(/…/g, '.');
+  t = t.replace(/\s*:\s*/g, ' : ').replace(/\s+([.!?,])/g, '$1').replace(/([.!?,])\1+/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  return t;
+}
+function speak(text, opt) {
+  text = speechText(text); var rate = Number(S.settings.voiceRate) || 0.95;
+  loadVoices().then(function (list) {
+    var v = pickVoice(list);
+    if (N && N.TextToSpeech) {
+      var o = { text: text, lang: v ? v.lang.replace('_', '-') : 'fr-FR', rate: rate, pitch: 1.0, volume: 1.0, category: 'playback' }; if (v) o.voice = v.i;
+      return N.TextToSpeech.stop().catch(function () { }).then(function () { return N.TextToSpeech.speak(o); }).catch(function (e) {
+        if (v && o.voice != null) { delete o.voice; o.lang = 'fr-FR'; return N.TextToSpeech.speak(o); } throw e;
+      }).catch(function (e) { toast('Lecture impossible. (' + errMsg(e) + ')'); });
+    }
     var ss = window.speechSynthesis; if (!ss) throw 0; ss.cancel();
-    var u = new SpeechSynthesisUtterance(text); u.lang = 'fr-FR'; u.rate = 0.95;
-    var v = ss.getVoices().filter(function (x) { return /^fr/i.test(x.lang); })[0]; if (v) u.voice = v;
+    var u = new SpeechSynthesisUtterance(text); u.lang = v ? v.lang : 'fr-FR'; u.rate = rate; if (v) u.voice = v.raw;
     ss.speak(u);
-  } catch (e) { toast('La lecture à voix haute n\'est pas disponible ici.'); }
+  }).catch(function () { toast('La lecture à voix haute n\'est pas disponible ici.'); });
 }
 function briefText() {
   var pr = priorities(), name = S.settings.name, L = pr.list;
@@ -1770,7 +1830,7 @@ function decodeAudioBlob(blob) {
     });
   });
 }
-var ASR_MODELS = { base: { id: 'onnx-community/whisper-base', label: 'Rapide', size: 'environ 80 Mo' }, small: { id: 'onnx-community/whisper-small', label: 'Précis', size: 'environ 250 Mo' } };
+var ASR_MODELS = { small: { id: 'onnx-community/whisper-small', label: 'Précis', size: 'environ 250 Mo' }, base: { id: 'onnx-community/whisper-base', label: 'Rapide', size: 'environ 80 Mo' } };
 var asrWorker = null;
 function runTranscription(blob, name) {
   ui.au = { stage: 'decode', name: name || 'audio', pct: 0, text: '', props: null, err: '' }; render();
@@ -1787,7 +1847,7 @@ function runTranscription(blob, name) {
       else if (m.type === 'error') { a.stage = 'error'; a.err = /fetch|network|Failed to fetch/i.test(m.message) ? 'Le modèle de transcription doit être téléchargé une première fois : connectez-vous à internet (de préférence en Wi-Fi) puis réessayez.' : 'Transcription impossible. (' + m.message + ')'; }
       var box = document.getElementById('aubox'); if (box && view.name === 'audio') box.innerHTML = audioBox(); else render();
     };
-    var model = (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.base).id;
+    var model = (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.small).id;
     asrWorker.postMessage({ type: 'transcribe', model: model, audio: d.pcm }, [d.pcm.buffer]);
   }).catch(function (e) {
     ui.au.stage = 'error'; ui.au.err = /decode|EncodingError|Unable/i.test(errMsg(e)) ? "Ce format audio n'est pas lu par cet appareil. Essayez un fichier .m4a, .mp3 ou .wav, ou la note vocale WhatsApp depuis un téléphone Android." : errMsg(e); render();
@@ -1823,7 +1883,7 @@ function V_audio(p0) {
   h += '<div id="aubox" class="stack" style="gap:14px">' + audioBox() + '</div>';
   if (!ui.au) {
     h += '<div class="note">' + ic('info', 18) + '<span>' + (N ? 'Astuce : dans WhatsApp ou votre app d\'enregistrement, touchez « Partager » puis Best Support : le fichier arrive ici directement.' : 'Sur iPhone : enregistrez la note vocale dans Fichiers (Partager, Enregistrer dans Fichiers), puis choisissez-la ici.') + '</span></div>';
-    h += '<div class="note o">' + ic('info', 18) + '<span>Pensez à prévenir la personne avant d\'enregistrer une conversation. La première analyse télécharge un modèle de transcription (' + (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.base).size + ') : faites-la en Wi-Fi.</span></div>';
+    h += '<div class="note o">' + ic('info', 18) + '<span>Pensez à prévenir la personne avant d\'enregistrer une conversation. La première analyse télécharge un modèle de transcription (' + (ASR_MODELS[S.settings.asrModel] || ASR_MODELS.small).size + ') : faites-la en Wi-Fi.</span></div>';
   }
   return h + '</div>';
 }
@@ -1831,9 +1891,9 @@ function V_audio(p0) {
 /* Juste après un appel (Android) */
 function V_afterCall(p0) {
   var pp = person(p0.pid);
-  var name = pp ? pp.name : (p0.n || 'votre proche'), mins = p0.d ? Math.max(1, Math.round(Number(p0.d) / 60)) : 0;
+  var name = pp ? pp.name : (p0.n || 'votre proche'), sec = Number(p0.d) || 0, dur = sec ? (sec < 60 ? sec + ' s. ' : Math.round(sec / 60) + ' min. ') : '';
   var h = '<div class="screen nonav"><div class="row between"><button type="button" class="iconbtn" data-act="tab" data-to="home" aria-label="Fermer">' + ic('x') + '</button><span></span></div>';
-  h += '<section class="card" style="align-items:center;text-align:center;gap:10px"><div class="av lg">' + esc(initials(name)) + '</div><h1 class="h2">Appel avec ' + esc(name) + ' terminé</h1><p class="muted">' + (mins ? mins + ' min. ' : '') + 'Quelque chose à noter ? Une promesse, un rendez-vous, une dette…</p>' +
+  h += '<section class="card" style="align-items:center;text-align:center;gap:10px"><div class="av lg">' + esc(initials(name)) + '</div><h1 class="h2">Appel avec ' + esc(name) + ' terminé</h1><p class="muted">' + dur + 'Quelque chose à noter ? Une promesse, un rendez-vous, une dette…</p>' +
     '<button type="button" class="btn btn-dark btn-block" data-act="voiceFor" data-pid="' + esc(p0.pid || '') + '">' + ic('mic', 18) + ' Dicter</button></section>';
   h += '<form class="stack" style="gap:10px" data-form="quicknote" novalidate><div class="field"><label for="qn">Ou écrivez</label><textarea class="in" id="qn" data-f="qn" placeholder="Ex. Il me rend les 15 000 vendredi. On se voit samedi à 10h pour la dot.">' + esc(F.qn || '') + '</textarea></div><button type="submit" class="btn btn-ghost btn-block">Analyser ma note</button></form>';
   if (ui.qprops) {
@@ -1842,6 +1902,16 @@ function V_afterCall(p0) {
   if (pp) h += '<a class="btn btn-link" href="#" data-act="go" data-to="audio" data-pid="' + pp.id + '">Analyser l\'enregistrement de cet appel</a>';
   h += '<button type="button" class="btn btn-ghost btn-block" data-act="nothingToNote" data-pid="' + esc(p0.pid || '') + '">Rien à noter</button>';
   return h + '</div>';
+}
+function autoAfterCall() {
+  if (!N || !N.CallNotes || !S.settings.onboarded) return;
+  var asked = false; try { asked = localStorage.getItem('bs-ac-asked') === '1'; localStorage.setItem('bs-ac-asked', '1'); } catch (e) { }
+  if (asked) { N.CallNotes.setEnabled({ on: !!S.settings.afterCall }).catch(function () { }); return; }
+  if (!S.settings.afterCall) return;
+  N.CallNotes.requestAccess().then(function (r) {
+    S.settings.afterCall = !!r.granted; N.CallNotes.setEnabled({ on: !!r.granted }); save(); if (view.name === 'settings') render();
+    if (r.granted) toast('Après chaque appel avec un proche, Best Support vous proposera une note. Désactivable dans Paramètres.');
+  }).catch(function () { });
 }
 function pushCallPeople() {
   if (!N || !N.CallNotes) return;
@@ -1882,7 +1952,7 @@ function searchResults() {
 /* Compte Google et synchronisation entre appareils */
 var sb = null, sbUser = null, syncBusy = false, syncErr = '', syncTimer = null;
 var SYNC_COLS = ['people', 'items', 'contacts', 'routines', 'tontines', 'gifts', 'cotis'];
-var LOCAL_SETTINGS = ['afterCall', 'asrModel', 'lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
+var LOCAL_SETTINGS = ['afterCall', 'asrModel', 'voice', 'voiceRate', 'lock', 'pinHash', 'callSync', 'callSince', 'calIds', 'calSyncAt', 'lastUpdateCheck', 'updateInfo', 'seenVersion', 'onboarded', 'firstUse', 'zoom', 'theme'];
 function hashStr(t) { var h = 5381; for (var i = 0; i < t.length; i++) h = ((h << 5) + h + t.charCodeAt(i)) | 0; return h; }
 function syncRecords() {
   var out = {};
@@ -2225,6 +2295,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.8.1 bêta', items: ['Note après appel activée d\'office (désactivable dans Paramètres), dès 2 secondes d\'appel avec un proche', 'Lecture à voix haute : la meilleure voix française de votre téléphone, dates, heures et montants bien prononcés', 'Choix de la voix et de la vitesse, avec un exemple à écouter', 'Transcription « Précis » par défaut, accélérée par la carte graphique quand le téléphone le permet'] },
   { v: '0.8 bêta', items: ['Après un appel avec un proche (Android) : une notification vous propose de noter une promesse, un rendez-vous ou une dette', 'Analyser un appel : enregistrement ou note vocale WhatsApp transcrit sur votre appareil, engagements détectés à valider', 'Partagez un fichier audio vers Best Support depuis WhatsApp ou votre enregistreur'] },
   { v: '0.7 bêta', items: ['Mode famille : partagez une tontine ou une cotisation avec un code, chacun voit qui a payé', 'Nouveau module Cotisations : mariages, funérailles, baptêmes, dot', 'Rejoindre un groupe avec le code reçu d\'un proche', 'Liens Confidentialité et Conditions dans À propos'] },
   { v: '0.6 bêta', items: ['Importer vos contacts Google directement', 'Les contacts déjà enregistrés ne sont plus importés en double', 'Recherche par nom ou numéro, « Tout cocher » pour l\'import en masse', 'Nouvelle icône Paramètres'] },
@@ -2379,6 +2450,8 @@ var ACT = {
   },
   pickContact: function () { pickOneContact(); },
   googleContacts: function () { startGoogleContacts(); },
+  testVoice: function () { speak('Bonjour ' + (S.settings.name || '') + '. Mardi 3 novembre à 10h, mariage de Kouamé à Cocody. Pensez à remettre les 25 000 F CFA de la cotisation à M. Konan.'); },
+  installVoices: function () { if (N && N.TextToSpeech && N.TextToSpeech.openInstall) N.TextToSpeech.openInstall().catch(function () { toast('Ouvrez Paramètres Android, puis Synthèse vocale.'); }); },
   setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
   voiceFor: function (d) { startVoice(d.pid || ''); },
   nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
@@ -2592,6 +2665,8 @@ document.addEventListener('change', function (e) {
   if (el.id === 'vcfFile' && el.files && el.files[0]) {
     var fr = new FileReader(); fr.onload = function () { var cards = parseVcf(String(fr.result)); if (!cards.length) { ui.cerr = 'Aucun contact trouvé dans ce fichier.'; render(); return; } if (cards.length === 1) { var r1 = addOrMergePerson(cards[0], 'amis'); save(); F = {}; go('personForm', { id: r1.p.id, after: 'people' }); toast(r1.isNew ? r1.p.name + ' ajouté.' : r1.p.name + ' complété.'); return; } ui.pc = cards.sort(function (a, b) { return a.name.localeCompare(b.name); }); ui.sel = {}; ui.cerr = ''; render(); }; fr.readAsText(el.files[0]); return;
   }
+  if (el.id === 's-voice') { S.settings.voice = el.value; save(); speak('Voici cette voix. Vos relations, toujours en tête.'); return; }
+  if (el.id === 's-vrate') { S.settings.voiceRate = Number(el.value); save(); speak('Voici la vitesse choisie.'); return; }
   if (el.id === 'audioFile' && el.files && el.files[0]) { var fl = el.files[0]; runTranscription(fl, fl.name); return; }
   if (el.dataset && el.dataset.aupid) { ui.auPid = el.value; if (ui.au && ui.au.props) ui.au.props.forEach(function (r) { if (!r._pidSet) r.personId = r.personId || el.value; }); return; }
   if (el.dataset && el.dataset.apick != null) { ui.au.pick[Number(el.dataset.apick)] = el.checked; return; }
@@ -2632,6 +2707,7 @@ render();
 checkReminders();
 initNative();
 initSync();
+try { if (localStorage.getItem('bs-v081') !== '1') { localStorage.setItem('bs-v081', '1'); if (S.settings.asrModel === 'base') S.settings.asrModel = 'small'; if (S.settings.afterCall === false && localStorage.getItem('bs-ac-asked') !== '1') S.settings.afterCall = true; save(); } } catch (e) { }
 if (N) {
   window.addEventListener('bsShared', handleShared);
   handleShared();
@@ -2642,7 +2718,7 @@ if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
 flushOutbox();
 
 // exposé pour les tests
-window.__BS = { sync: syncNow, parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
+window.__BS = { speechText: speechText, sync: syncNow, parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
 })();
 </script>
 
