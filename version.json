@@ -1,6 +1,6 @@
 {
-  "build": 15,
-  "version": "0.9 bêta",
+  "build": 16,
+  "version": "0.9.1 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Parlez à Best Support, relances polies, vœux prêts, widget avec micro."
+  "notes": "Les appels WhatsApp comptent aussi : contact noté et note après l'appel."
 }

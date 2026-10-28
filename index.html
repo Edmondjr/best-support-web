@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.9 bêta';
+var VERSION = '0.9.1 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -775,10 +775,10 @@ function initNative() {
   N.App.addListener('appStateChange', function (st) {
     if (!st.isActive) { hiddenAt = Date.now(); return; }
     if (lockOn() && Date.now() - hiddenAt > 60000) locked = true;
-    syncCalls(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); handleShared(); render();
+    syncCalls(); syncWaCalls(); checkWa(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); handleShared(); render();
   });
   N.App.addListener('backButton', function () { if (locked) { N.App.minimizeApp(); return; } if (stack.length) { F = {}; back(); } else if (view.name !== 'home' && S.settings.onboarded) tab('home'); else N.App.minimizeApp(); });
-  syncCalls();
+  syncCalls(); syncWaCalls(); checkWa();
 }
 function checkExact() {
   if (!N || !N.LocalNotifications.checkExactNotificationSetting) return;
@@ -786,6 +786,33 @@ function checkExact() {
 }
 
 /* Contact automatique via le journal d'appels */
+var WA_OK = null;
+function checkWa() {
+  if (!N || !N.CallNotes || !N.CallNotes.waAccess) return Promise.resolve(false);
+  return N.CallNotes.waAccess().then(function (r) { var was = WA_OK; WA_OK = !!(r && r.granted); if (was !== WA_OK) render(); return WA_OK; }).catch(function () { return false; });
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+function syncWaCalls() {
+  if (!N || !N.CallNotes || !N.CallNotes.consumeWaCalls) return;
+  N.CallNotes.consumeWaCalls().then(function (r) {
+    var n = 0;
+    (r && r.calls || []).forEach(function (c) {
+      var p = person(c.id); if (!p) return;
+      var ds = iso(new Date(Number(c.at) || Date.now()));
+      if (!p.last || diff(p.last, ds) > 0) p.last = ds;
+      if (!S.contacts.some(function (x) { return x.personId === p.id && x.date === ds; })) { S.contacts.push({ id: uid(), personId: p.id, date: ds, how: 'whatsapp' }); n++; }
+    });
+    if (n) { save(); render(); }
+  }).catch(function () { });
+}
+function waBlock(compact) {
+  if (!N || !N.CallNotes || !N.CallNotes.waAccess) return '';
+  if (WA_OK) return compact ? '' : '<div class="row between" style="min-height:48px"><span style="font-weight:600">Appels WhatsApp</span><span class="small" style="color:var(--green-ink);font-weight:700">' + ic('check', 16) + ' Pris en compte</span></div>';
+  var txt = 'WhatsApp n\'inscrit pas ses appels dans le journal du téléphone. Autorisez Best Support à voir uniquement la notification « appel en cours » de WhatsApp (le nom et la durée), jamais vos messages.';
+  if (compact) return '<div class="note">' + ic('phone', 18) + '<span class="grow">Vos appels WhatsApp peuvent aussi compter : contact noté et note après l\'appel.</span><button type="button" class="btn-link" style="min-height:24px" data-act="waAllow">Autoriser</button><button type="button" class="iconbtn" style="width:32px;height:32px;min-height:32px" data-act="waHide" aria-label="Masquer">' + ic('x', 14) + '</button></div>';
+  return '<div class="stack" style="gap:8px;padding-top:6px"><span style="font-weight:600">Appels WhatsApp</span><p class="small muted">' + txt + '</p><button type="button" class="btn btn-ghost" data-act="waAllow">' + ic('phone', 18) + ' Autoriser les appels WhatsApp</button></div>';
+}
 function syncCalls(manual) {
   if (!N || !S.settings.callSync) return;
   var since = S.settings.callSince || (Date.now() - 30 * 86400000);
@@ -970,6 +997,7 @@ function V_home() {
   if (updateInfo) h += '<div class="note o">' + ic('download', 18) + '<span class="grow">Nouvelle version ' + esc(updateInfo.version || '') + ' disponible.</span><a class="btn-link" style="min-height:24px" href="' + esc(updateInfo.apk || 'https://bestsupport.mrdnej.com/downloads/BestSupport.apk') + '" target="_blank" rel="noopener">Télécharger</a></div>';
   if (surveyDue()) h += '<div class="note">' + ic('star', 18) + '<span class="grow">Une semaine avec Best Support : 3 questions rapides ?</span><button type="button" class="btn-link" style="min-height:24px" data-act="go" data-to="survey">Répondre</button></div>';
   h += '<div class="beta"><b>BÊTA</b><span>De nouvelles améliorations arrivent régulièrement.</span></div>';
+  if (N && WA_OK === false && S.settings.afterCall && !lsGet('bs-wa-hide')) h += waBlock(true);
   if (S.demo) h += '<div class="note o">' + ic('info', 18) + '<span class="grow">Vous voyez des données d\'exemple.</span><button type="button" class="btn-link" style="min-height:24px" data-act="clearDemo">Effacer</button></div>';
   if (pr.rest) h += '<div class="note">' + ic('moon', 18) + '<span>C\'est votre jour de repos. Seules les urgences s\'affichent aujourd\'hui.</span></div>';
 
@@ -1399,9 +1427,9 @@ function V_settings() {
     switchRow('Point du matin à ' + (S.settings.morningHour || 7) + ' h', S.settings.morning !== false, 'setToggle', '', 'morning') +
     switchRow('Bilan du lundi matin', S.settings.weekly !== false, 'setToggle', '', 'weekly') +
     '<div class="field"><label for="s-mh">Heure du point du matin</label><select class="in" id="s-mh" data-f="morningHour">' + [5, 6, 7, 8, 9].map(function (x) { return '<option value="' + x + '"' + (Number(F.morningHour || S.settings.morningHour || 7) === x ? ' selected' : '') + '>' + x + ' h</option>'; }).join('') + '</select></div>' + '</section>';
-  if (N) h += '<section class="card"><h2 class="h2">Contact noté automatiquement</h2><p class="small muted">Quand vous appelez un proche (appel décroché), son dernier contact se met à jour tout seul. Rien ne quitte votre téléphone.</p>' +
+  if (N) h += '<section class="card"><h2 class="h2">Contact noté automatiquement</h2><p class="small muted">Quand vous appelez un proche (appel décroché, téléphone ou WhatsApp), son dernier contact se met à jour tout seul. Rien ne quitte votre téléphone.</p>' +
     switchRow('Utiliser mon journal d\'appels', !!S.settings.callSync, 'callSyncToggle', '', 'callSync') +
-    switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') +
+    switchRow('Proposer une note après chaque appel', !!S.settings.afterCall, 'afterCallToggle', '', 'afterCall') + waBlock(false) +
     (S.settings.callSync ? '<button type="button" class="btn btn-ghost" data-act="syncCallsNow">Vérifier maintenant</button>' : '') + '</section>';
   if (!ui.asrPick && !ui.asrPicking) { ui.asrPicking = 1; var keep = S.settings.asrModel; S.settings.asrModel = 'auto'; pickAsrModel().then(function (k) { ui.asrPick = k; if (view.name === 'settings') render(); }); S.settings.asrModel = keep; }
   if (!VOICE_LIST && !ui.voicesLoading) { ui.voicesLoading = 1; loadVoices().then(function () { if (view.name === 'settings') render(); }); }
@@ -2083,7 +2111,7 @@ function pushCallPeople() {
   if (!N || !N.CallNotes) return;
   var arr = [];
   S.people.forEach(function (pp) { phonesOf(pp).forEach(function (x) { var k = numKey(x.n); if (k.length === 8) arr.push({ k: k, id: pp.id, name: pp.name }); }); });
-  N.CallNotes.setPeople({ people: arr }).catch(function () { });
+  N.CallNotes.setPeople({ people: arr, names: S.people.map(function (pp) { return { id: pp.id, name: pp.name }; }) }).catch(function () { });
 }
 function handleShared() {
   if (!N || !N.CallNotes) return;
@@ -2464,6 +2492,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.9.1 bêta', items: ['Appels WhatsApp pris en compte : contact noté et note après l\'appel, après une autorisation unique'] },
   { v: '0.9 bêta', items: ['Notifications plus utiles : « C\'est fait », « Demain » et « Appeler » directement', 'Point du matin : touchez « Écouter » pour l\'entendre', 'Relances polies sur WhatsApp, au tutoiement ou au vouvoiement selon la personne, et rappel de cotisation pour le groupe', 'Parlez à Best Support : « Qu\'est-ce que je dois faire cette semaine ? », « La dette de Koffi est payée »', 'Anniversaires : alerte 3 jours avant pour vos proches, avec le souvenir du dernier don', 'Vœux prêts pour Noël, le Nouvel An, Pâques, Tabaski et Korité', 'Widget : vos 3 priorités et un bouton micro', 'Bilan sur 7 ou 30 jours, et rappel mensuel de ceux qui attendent de vos nouvelles'] },
   { v: '0.8.2 bêta', items: ['Transcription en mode Automatique : Best Support choisit le modèle le plus précis que votre téléphone peut faire tourner rapidement'] },
   { v: '0.8.1 bêta', items: ['Note après appel activée d\'office (désactivable dans Paramètres), dès 2 secondes d\'appel avec un proche', 'Lecture à voix haute : la meilleure voix française de votre téléphone, dates, heures et montants bien prononcés', 'Choix de la voix et de la vitesse, avec un exemple à écouter', 'Transcription « Précis » par défaut, accélérée par la carte graphique quand le téléphone le permet'] },
@@ -2631,6 +2660,8 @@ var ACT = {
     else { it.due = c.due; msg = 'Reporté au ' + fmtLong(c.due).toLowerCase() + '.'; }
     save(); stack = []; tab('home'); toast(msg); speak(msg); },
   feteSent: function (d, el) { try { window.open(el.getAttribute('href'), '_blank'); } catch (e) { } var k = 'fete:' + d.k + ':' + today().slice(0, 4); S.checks[k] = S.checks[k] || []; if (S.checks[k].indexOf(d.id) < 0) S.checks[k].push(d.id); var pp = person(d.id); if (pp) markContact(pp); save(); setTimeout(render, 600); return 'keep'; },
+  waAllow: function () { if (!N || !N.CallNotes) return; toast('Dans la liste, activez « Best Support », puis revenez ici.'); setTimeout(function () { N.CallNotes.openWaAccess().catch(function () { }); }, 600); },
+  waHide: function () { lsSet('bs-wa-hide', '1'); render(); },
   setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
   voiceFor: function (d) { startVoice(d.pid || ''); },
   nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
