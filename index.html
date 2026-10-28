@@ -232,7 +232,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.8.2 bêta';
+var VERSION = '0.9 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -415,6 +415,18 @@ function myIdx(t) {
 function iPaid(t, k) { var me = myIdx(t); return me >= 0 && paidList(t, k).indexOf(me) >= 0; }
 function setPaid(t, k, idx, on) { t.paid = t.paid || {}; var arr = t.paid[k] || (t.paid[k] = []); var at = arr.indexOf(idx); if (on && at < 0) arr.push(idx); if (!on && at >= 0) arr.splice(at, 1); }
 
+function V_fete(p0) {
+  var k = p0.k || '', ppl = S.people.filter(function (pp) { return pp.circle !== 'reseau'; }).sort(function (a, b) { return (CIRCLES[b.circle] || CIRCLES.amis).w - (CIRCLES[a.circle] || CIRCLES.amis).w || a.name.localeCompare(b.name); });
+  var sent = (S.checks['fete:' + k + ':' + today().slice(0, 4)] || []);
+  var h = '<div class="screen">' + head(k ? 'Vœux : ' + k : 'Vœux');
+  h += '<p class="muted">Un message prêt pour chacun. Touchez WhatsApp : le message s\'ouvre, vous n\'avez plus qu\'à l\'envoyer.</p>';
+  h += ppl.length ? '<div class="list">' + ppl.slice(0, 40).map(function (pp) {
+    var txt = feteMsg(k, pp), on = sent.indexOf(pp.id) >= 0;
+    return '<div class="li"><span class="av">' + esc(initials(pp.name)) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(pp.name) + '</span><span class="sub">' + (on ? 'Envoyé' : esc((CIRCLES[pp.circle] || CIRCLES.amis).label)) + '</span></span><a class="btn ' + (on ? 'btn-ghost' : 'btn-green') + '" style="min-height:40px" href="' + esc(waNum(pp) ? waLink(waNum(pp), txt) : 'https://wa.me/?text=' + encodeURIComponent(txt)) + '" target="_blank" rel="noopener" data-act="feteSent" data-k="' + esc(k) + '" data-id="' + pp.id + '">' + ic('send', 16) + ' WhatsApp</a></div>';
+  }).join('') + '</div>' : '<section class="card empty"><p class="small muted">Ajoutez vos proches pour leur envoyer vos vœux.</p></section>';
+  return h + '</div>';
+}
+
 /* Registre des dons */
 var OCCASIONS = ['Mariage', 'Funérailles', 'Baptême', 'Naissance', 'Anniversaire', 'Diplôme', 'Autre'];
 function giftsOf(pid) { return S.gifts.filter(function (g) { return g.personId === pid; }); }
@@ -432,12 +444,44 @@ var MSG = {
   nouvelles: { label: 'Prendre des nouvelles', list: ['Bonjour {nom}, ça fait un moment ! Comment vas-tu ? Et la famille ?', 'Salut {nom}, je pensais à toi. Tout va bien de ton côté ?', 'Bonjour {nom}, j\'espère que vous allez bien. Je prends de vos nouvelles. Bonne journée à vous.'] },
   felic: { label: 'Félicitations', list: ['Félicitations {nom} ! Je suis vraiment heureux pour toi. Que Dieu continue de bénir tout ce que tu entreprends.', 'Bravo {nom}, c\'est mérité ! On fête ça bientôt.', 'Toutes mes félicitations {nom}. Que cette réussite soit le début de beaucoup d\'autres.'] },
   condol: { label: 'Condoléances', list: ['{nom}, j\'ai appris la triste nouvelle. Je suis de tout cœur avec toi et ta famille. Que Dieu vous donne la force et le réconfort.', 'Mes sincères condoléances {nom}. Je pense fort à vous dans ce moment difficile. Je reste disponible pour tout ce dont tu as besoin.', 'Toutes mes condoléances à toi et à la famille, {nom}. Que l\'âme du défunt repose en paix.'] },
-  relance: { label: 'Relance de dette', list: ['Bonjour {nom}, j\'espère que tu vas bien. Je reviens vers toi pour les {montant} de la dernière fois. Dis-moi quand ce sera possible pour toi, sans pression.', 'Salut {nom} ! Petit rappel amical pour les {montant}. Tu me dis quand ça t\'arrange.', 'Bonjour {nom}, est-ce qu\'on peut s\'arranger pour le remboursement des {montant} cette semaine ? Merci d\'avance.'] }
+  relance: { label: 'Relance de dette', dyn: 1, list: ['Bonjour {nom}, j\'espère que tu vas bien. Je reviens vers toi pour les {montant} de la dernière fois. Dis-moi quand ce sera possible pour toi, sans pression.', 'Salut {nom} ! Petit rappel amical pour les {montant}. Tu me dis quand ça t\'arrange.', 'Bonjour {nom}, est-ce qu\'on peut s\'arranger pour le remboursement des {montant} cette semaine ? Merci d\'avance.'] }
 };
 function fillMsg(tpl, p) {
   var owed = S.items.filter(function (i) { return i.type === 'dette' && !i.done && i.dir === 'on_me_doit' && i.personId === p.id; }).reduce(function (a, i) { return a + remaining(i); }, 0);
   return tpl.replace(/\{nom\}/g, p.name).replace(/\{montant\}/g, owed ? money(owed).replace(' F', ' FCFA') : 'sous');
 }
+
+var RESPECT_RX = /^(tante|tantie|tonton|oncle|papa|maman|m\.|mme|mlle|monsieur|madame|pasteur|pr\.?|docteur|dr\.?|vieux|vieille|doyen|chef|abbé|imam|père|mère|grand-?père|grand-?mère|mamie|papi)\b/i;
+function saysVous(p) { return !p || RESPECT_RX.test(p.name || '') || p.circle === 'reseau' || p.circle === 'famille_elargie'; }
+function sinceTxt(d) { return d < 14 ? d + ' jours' : d < 60 ? Math.round(d / 7) + ' semaines' : Math.round(d / 30) + ' mois'; }
+function personTel(p) { var ps = phonesOf(p); var a = ps.filter(function (x) { return x.label === 'appel'; })[0] || ps[0]; return a ? a.n : ''; }
+function lastGiftTo(p) { return (S.gifts || []).filter(function (g) { return g.personId === p.id && g.dir !== 'recu'; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0] || null; }
+function lastGiftFrom(p) { return (S.gifts || []).filter(function (g) { return g.personId === p.id && g.dir === 'recu'; }).sort(function (a, b) { return a.date < b.date ? 1 : -1; })[0] || null; }
+function giftMemo(p) {
+  var g = lastGiftTo(p), r = lastGiftFrom(p), out = [];
+  if (g) out.push('Dernier don de votre part : ' + (g.amount ? money(g.amount) + ', ' : '') + g.occasion.toLowerCase() + ' (' + fmtDM(g.date) + ' ' + g.date.slice(0, 4) + ')');
+  if (r) out.push('Reçu de ' + p.name + ' : ' + (r.amount ? money(r.amount) + ', ' : '') + r.occasion.toLowerCase() + ' (' + fmtDM(r.date) + ' ' + r.date.slice(0, 4) + ')');
+  return out.join('. ');
+}
+function relanceTexts(p, it) {
+  var amt = it ? remaining(it) : S.items.filter(function (i) { return i.type === 'dette' && !i.done && i.dir === 'on_me_doit' && i.personId === p.id; }).reduce(function (a, i) { return a + remaining(i); }, 0);
+  var m = amt ? money(amt).replace(' F', ' FCFA') : 'sous', late = it && it.due && diff(today(), it.due) < 0, v = saysVous(p), n = p.name;
+  if (v) return [
+    'Bonjour ' + n + ', j\'espère que vous allez bien, ainsi que la famille. Je me permets de revenir vers vous au sujet des ' + m + '. Dites-moi quand cela vous arrangera. Merci beaucoup.',
+    late ? 'Bonjour ' + n + ', je reviens vers vous concernant les ' + m + ' : la date convenue est passée. Pouvons-nous trouver un moment cette semaine ? Je vous remercie.' : 'Bonjour ' + n + ', petit rappel respectueux pour les ' + m + '. Je vous remercie d\'avance.',
+    'Bonsoir ' + n + ', excusez-moi de vous déranger. Je voulais savoir quand il serait possible de régler les ' + m + '. Que Dieu vous bénisse.'];
+  return [
+    'Salut ' + n + ', j\'espère que tu vas bien ! Je reviens vers toi pour les ' + m + '. Dis-moi quand ça t\'arrange, sans pression.',
+    late ? 'Bonjour ' + n + ', petit rappel pour les ' + m + ' : la date qu\'on avait fixée est passée. On peut régler ça cette semaine ? Merci !' : 'Salut ' + n + ' ! Petit rappel amical pour les ' + m + '. Tu me dis quand c\'est bon pour toi.',
+    n + ', on peut s\'arranger pour les ' + m + ' ? Même en plusieurs fois, ça me va. Merci d\'avance.'];
+}
+function cotiReminder(c) {
+  var unpaid = (c.participants || []).filter(function (x, i) { return i !== myIdx(c) && !(Number(x.paid) > 0); });
+  return 'Bonjour à tous, petit rappel pour la cotisation « ' + c.name + ' »' + (c.amount ? ' (' + money(c.amount).replace(' F', ' FCFA') + ' par personne)' : '') + (c.date ? ', avant le ' + fmtDM(c.date) : '') + '. Merci à ceux qui ont déjà donné. ' + (unpaid.length ? 'Il manque encore : ' + unpaid.map(function (x) { return x.name; }).join(', ') + '. ' : '') + 'Que Dieu vous bénisse.';
+}
+var FETES = { "Jour de l'An": 'Bonne et heureuse année {nom} ! Que cette nouvelle année vous apporte santé, paix et prospérité.', 'Noël': 'Joyeux Noël {nom} ! Que la paix et la joie de Noël remplissent votre foyer.', 'Lundi de Pâques': 'Joyeuses Pâques {nom} ! Que la lumière de la Résurrection vous accompagne.', 'Tabaski': 'Bonne fête de Tabaski {nom} ! Que Dieu accepte vos prières et bénisse votre famille.', 'Korité': 'Bonne fête de Korité {nom} ! Que Dieu exauce vos prières. Aïd Moubarak.', "Fête de l'Indépendance": 'Bonne fête de l\'Indépendance {nom} ! Vive la Côte d\'Ivoire.' };
+function feteKey(label) { var k = String(label).replace(/ \(date à confirmer\)/, ''); return FETES[k] ? k : ''; }
+function feteMsg(k, p) { var t = FETES[k] || ''; if (saysVous(p)) return t.replace('{nom}', p.name); return t.replace('{nom}', p.name).replace(/vous apporte/, 't\'apporte').replace(/votre foyer/, 'ton foyer').replace(/vous accompagne/, 't\'accompagne').replace(/vos prières/g, 'tes prières').replace(/votre famille/, 'ta famille'); }
 
 /* ---------- Moteur de priorité ---------- */
 // Score = 0,45 x Urgence + 0,30 x Cercle + 0,25 x Retard (0 à 100)
@@ -472,8 +516,8 @@ function personScore(p) {
   var reasons = [];
   if (U >= 40 && best) reasons.push(best.label);
   reasons.push(c.label);
-  if (R >= 100) reasons.push(since + ' j sans nouvelles');
-  else if (R >= 50) reasons.push(since + ' j depuis le dernier contact');
+  if (R >= 100) reasons.push(sinceTxt(since) + ' sans nouvelles');
+  else if (R >= 50) reasons.push(sinceTxt(since) + ' depuis le dernier contact');
   return { score: score, U: U, C: c.w, R: R, since: since, rhythm: rhythm, best: best, reasons: reasons, circle: c };
 }
 function itemScore(it) {
@@ -638,21 +682,28 @@ function updateWidget() {
   if (!N || !N.Widget) return;
   try {
     var pr = priorities(), top = pr.list[0];
-    var payload = top ? { label: pr.rest ? 'Jour de repos' : 'Priorité du jour', title: top.title, sub: top.kind === 'person' ? top.p.name + ' · ' + top.sub : top.sub, score: String(top.score), more: pr.list.length > 1 ? '+' + (pr.list.length - 1) + ' autre' + (pr.list.length > 2 ? 's' : '') : '' }
-      : { label: pr.rest ? 'Jour de repos' : 'Priorité du jour', title: S.people.length ? 'Rien d\'urgent' : 'Ajoutez vos proches', sub: S.people.length ? 'Appelez quelqu\'un que vous aimez.' : 'Ouvrez Best Support pour commencer.', score: '', more: '' };
+    var L = pr.list, payload = top ? { label: pr.rest ? 'Jour de repos' : (L.length > 1 ? 'Priorités du jour' : 'Priorité du jour'), title: top.title, sub: top.sub.split(' · ')[0], score: String(top.score), l2: L[1] ? '2.  ' + L[1].title : '', l3: L[2] ? '3.  ' + L[2].title : '', more: L.length > 3 ? '+' + (L.length - 3) + ' autre' + (L.length > 4 ? 's' : '') : '' }
+      : { label: pr.rest ? 'Jour de repos' : 'Priorité du jour', title: S.people.length ? 'Rien d\'urgent' : 'Ajoutez vos proches', sub: S.people.length ? 'Appelez quelqu\'un que vous aimez.' : 'Ouvrez Best Support pour commencer.', score: '', more: '', l2: '', l3: '' };
     N.Widget.update(payload).catch(function () { });
   } catch (e) { }
+}
+function keyTel(key) {
+  var a = String(key || '').split(':'), p = null;
+  if (a[0] === 'p') p = person(a[1]);
+  else if (a[0] === 'i') { var it = item(a[1]); p = it && it.personId ? person(it.personId) : null; }
+  return p ? personTel(p) : '';
 }
 function hashId(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return (Math.abs(h) % 2000000000) + 1; }
 function atTime(ds, h, m) { var d = parse(ds); d.setHours(h, m || 0, 0, 0); return d; }
 function buildSchedule() {
   var out = [], now = new Date(), real = iso(now), eve = Number(S.settings.eveHour) || 19, mh = Number(S.settings.morningHour) || 7;
   var restOf = function (ds) { return parse(ds).getDay() === Number(S.settings.restDay); };
-  var add = function (key, date, title, body, entryKey, urgent) {
+  var add = function (key, date, title, body, entryKey, urgent, type) {
     if (date <= now) return;
     if (restOf(iso(date)) && !urgent) return;
     var n = { id: hashId(key), title: title, body: body, largeBody: body, schedule: { at: date, allowWhileIdle: true }, channelId: 'rappels', extra: { key: entryKey || '' } };
-    if (entryKey) n.actionTypeId = 'bs-entry';
+    if (type) n.actionTypeId = type;
+    else if (entryKey) n.actionTypeId = keyTel(entryKey) ? 'bs-entry-call' : 'bs-entry';
     out.push(n);
   };
   for (var i = 0; i < 21; i++) {
@@ -664,8 +715,10 @@ function buildSchedule() {
     });
     S.people.forEach(function (p) {
       if (!p.bday) return;
-      if (p.bday.slice(5) === tm.slice(5)) add('bdeve:' + p.id + ':' + tm, atTime(d, eve), 'Demain, anniversaire de ' + p.name, 'Préparez un message ou un appel.', null, false);
-      if (p.bday.slice(5) === d.slice(5)) add('bd:' + p.id + ':' + d, atTime(d, 8), "C'est l'anniversaire de " + p.name, 'Un appel ou un message WhatsApp lui fera plaisir.', 'p:' + p.id, true);
+      var memo = giftMemo(p), close = p.circle === 'famille_proche' || p.circle === 'amis_proches';
+      if (close && p.bday.slice(5) === addDays(d, 3).slice(5)) add('bd3:' + p.id + ':' + d, atTime(d, mh, 15), 'Dans 3 jours : anniversaire de ' + p.name, (memo ? memo + '. ' : '') + 'Le temps de prévoir un petit geste ou un message.', 'p:' + p.id, false, 'bs-msg');
+      if (p.bday.slice(5) === tm.slice(5)) add('bdeve:' + p.id + ':' + tm, atTime(d, eve), 'Demain, anniversaire de ' + p.name, 'Préparez un message ou un appel.' + (memo ? ' ' + memo + '.' : ''), 'p:' + p.id, false, 'bs-msg');
+      if (p.bday.slice(5) === d.slice(5)) add('bd:' + p.id + ':' + d, atTime(d, 8), "C'est l'anniversaire de " + p.name, 'Un appel ou un message WhatsApp lui fera plaisir. Un message est prêt.', 'p:' + p.id, true, 'bs-msg');
     });
     S.routines.forEach(function (r) { if (r.on && Number(r.day) === dow) add('r:' + r.id + ':' + tm, atTime(d, eve), 'Demain : ' + r.title, 'Préparez : ' + r.checklist.join(', '), null, true); });
     (S.tontines || []).forEach(function (t) {
@@ -674,8 +727,10 @@ function buildSchedule() {
     });
     if (S.settings.morning !== false && !restOf(d)) {
       NOW_OVERRIDE = d; var pr = priorities(); NOW_OVERRIDE = null;
-      if (pr.list.length) add('m:' + d, atTime(d, mh), (pr.list.length === 1 ? '1 priorité' : pr.list.length + ' priorités') + " aujourd'hui", pr.list.slice(0, 3).map(function (e) { return e.title; }).join(' · '), null, false);
+      if (pr.list.length) add('m:' + d, atTime(d, mh), (pr.list.length === 1 ? '1 priorité' : pr.list.length + ' priorités') + " aujourd'hui", pr.list.slice(0, 3).map(function (e) { return e.title; }).join(' · '), 'm:', false, 'bs-morning');
     }
+    holidays(parse(tm).getFullYear()).forEach(function (hd) { var fk = feteKey(hd.label); if (fk && hd.date === tm) add('f:' + fk + ':' + tm, atTime(d, eve), 'Demain : ' + hd.label.replace(/ \(date à confirmer\)/, ''), 'Des vœux sont prêts pour vos proches, à envoyer sur WhatsApp en un geste.', 'f:' + fk, false, 'bs-fete'); });
+    if (S.settings.weekly !== false && d.slice(8) === '01') add('mo:' + d, atTime(d, mh, 45), 'Votre mois avec vos proches', 'Qui vous avez vu, qui attend de vos nouvelles : votre bilan du mois est prêt.', 'b:mois', false, 'bs-plain');
     if (S.settings.weekly !== false && parse(d).getDay() === 1) add('w:' + d, atTime(d, mh, 30), 'Votre bilan de la semaine est prêt', 'Voyez qui attend de vos nouvelles et ce qui arrive cette semaine.', null, false);
   }
   return out.sort(function (a, b) { return a.schedule.at - b.schedule.at; }).slice(0, 150);
@@ -697,9 +752,19 @@ function initNative() {
   if (!N) return;
   var LN = N.LocalNotifications;
   try { LN.createChannel({ id: 'rappels', name: 'Rappels', description: 'Rappels de Best Support', importance: 4, visibility: 1, vibration: true }); } catch (e) { }
-  try { LN.registerActionTypes({ types: [{ id: 'bs-entry', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }] }] }); } catch (e) { }
+  try { LN.registerActionTypes({ types: [
+    { id: 'bs-entry', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }] },
+    { id: 'bs-entry-call', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }, { id: 'call', title: 'Appeler' }] },
+    { id: 'bs-msg', actions: [{ id: 'msg', title: 'Écrire' }, { id: 'call', title: 'Appeler' }] },
+    { id: 'bs-morning', actions: [{ id: 'listen', title: 'Écouter' }] },
+    { id: 'bs-fete', actions: [{ id: 'open', title: 'Voir les vœux' }] },
+    { id: 'bs-plain', actions: [] }] }); } catch (e) { }
   LN.addListener('localNotificationActionPerformed', function (ev) {
     var key = ev.notification && ev.notification.extra && ev.notification.extra.key;
+    if (ev.actionId === 'call' && key) { var tn = keyTel(key); if (tn) { setTimeout(function () { window.location.href = telLink(tn); }, 300); } else openKey(key); return; }
+    if (ev.actionId === 'msg' && key) { var pm = person(key.split(':')[1]); if (pm) { F = {}; go('messages', { id: pm.id }); ui.occ = 'anniv'; render(); return; } }
+    if (ev.actionId === 'listen') { tab('home'); setTimeout(function () { speak(briefText()); }, 400); return; }
+    if (key === 'm:') { tab('home'); return; }
     if (ev.actionId === 'done' && key) { doDone(key); save(); toast("C'est noté depuis la notification."); }
     else if (ev.actionId === 'later' && key) { S.snooze[key] = addDays(today(), 1); save(); }
     else if (key) { openKey(key); return; }
@@ -807,7 +872,7 @@ function loadDemo() {
 function clearDemo() { S.people = []; S.items = []; S.contacts = []; S.tontines = []; S.gifts = []; S.checks = {}; S.snooze = {}; S.demo = false; }
 
 /* ---------- Navigation ---------- */
-var TAB_OF = { audio: 'people', cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
+var TAB_OF = { fete: 'people', vanswer: 'home', vconfirm: 'home', audio: 'people', cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
 function go(name, p, replace) {
   if (!replace) stack.push(view);
   view = { name: name, p: p || {} }; ui = {};
@@ -1017,6 +1082,7 @@ function V_person(p0) {
     '<button type="button" class="act" data-act="go" data-to="itemForm" data-person="' + p.id + '"><span class="c">' + ic('plus') + '</span>Engagement</button></div>' +
     (phonesOf(p).length ? '<div class="stack" style="gap:2px">' + phonesOf(p).map(function (x) { return '<p class="tiny muted">' + esc(PHONE_LABELS[x.label] || 'Autre') + ' : <span style="user-select:all;color:var(--fg);font-weight:700">' + esc(x.n) + '</span></p>'; }).join('') + '</div>' : '') + '</div>';
 
+  if (giftMemo(p)) h += '<div class="note">' + ic('heart', 18) + '<span>' + esc(giftMemo(p)) + '.</span></div>';
   h += '<button type="button" class="btn btn-ghost btn-block" data-act="go" data-to="audio" data-pid="' + p.id + '">' + ic('mic', 18) + ' Analyser un appel avec ' + esc(p.name) + '</button>';
   h += '<div class="grid2"><button type="button" class="btn btn-ghost" data-act="go" data-to="messages" data-id="' + p.id + '">' + ic('chat', 18) + ' Messages prêts</button><button type="button" class="btn btn-ghost" data-act="go" data-to="giftForm" data-person="' + p.id + '">' + ic('heart', 18) + ' Noter un don</button></div>';
   h += '<section class="card"><div class="row between"><h2 class="h2">Score de priorité</h2><span class="badge b-' + lv.k + '" style="font-size:15px">' + s.score + ' / 100</span></div><div class="bars">' +
@@ -1131,7 +1197,9 @@ function V_item(p0) {
       (it.payments && it.payments.length ? '<div class="stack" style="gap:4px">' + it.payments.map(function (pm) { return '<div class="row between small"><span>' + esc(fmtDM(pm.date)) + ' · <b class="money">' + money(pm.amount) + '</b></span><button type="button" class="btn-link" style="min-height:36px" data-act="delPayment" data-id="' + it.id + '" data-pid="' + pm.id + '">Retirer</button></div>'; }).join('') + '</div>' : '') +
       (!it.done ? '<div class="row" style="align-items:flex-end"><div class="field grow"><label for="pay-amt">' + (rec ? 'Montant reçu' : 'Montant remboursé') + ' (FCFA)</label><input class="in" id="pay-amt" type="number" inputmode="numeric" min="0" step="500" data-f="payAmt" value="' + esc(F.payAmt || '') + '" placeholder="5000"></div><button type="button" class="btn btn-green" data-act="addPayment" data-id="' + it.id + '">Noter</button></div>' + (ui.err ? '<p class="err" role="alert">' + esc(ui.err) + '</p>' : '') : '') +
       '</section>';
-    if (rec && p && waNum(p) && !it.done) h += '<a class="btn btn-ghost btn-block" href="' + esc(waLink(waNum(p), fillMsg(MSG.relance.list[0], p))) + '" target="_blank" rel="noopener">' + ic('chat', 18) + ' Relancer poliment sur WhatsApp</a>';
+    if (rec && p && !it.done) { var rt = relanceTexts(p, it)[Number(ui.rv) || 0];
+      h += '<section class="card"><div class="row between"><h2 class="h2">Relancer poliment</h2><button type="button" class="btn-link" style="min-height:32px" data-act="ui" data-k="rv" data-v="' + ((Number(ui.rv || 0) + 1) % 3) + '">Autre formulation</button></div><p class="small" style="line-height:1.55">' + esc(rt) + '</p>' +
+        '<a class="btn btn-green btn-block" href="' + esc(waNum(p) ? waLink(waNum(p), rt) : 'https://wa.me/?text=' + encodeURIComponent(rt)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' Envoyer sur WhatsApp</a><p class="tiny muted">' + (saysVous(p) ? 'Ton respectueux (vouvoiement) choisi pour ' + esc(p.name) + '.' : 'Ton amical (tutoiement) choisi pour ' + esc(p.name) + '.') + '</p></section>'; }
   }
   if (it.recur) h += '<div class="note">' + ic('clock', 18) + '<span>' + esc(RECUR[it.recur]) + ' : quand vous le marquez comme fait, le suivant est créé automatiquement.</span></div>';
   if (it.personId && it.type === 'evenement') { var gh = giftHint(it.personId); if (gh) h += '<div class="note o">' + ic('heart', 18) + '<span>' + esc(gh) + '</span></div>'; }
@@ -1218,7 +1286,7 @@ function V_plus() {
 }
 
 function V_bilan() {
-  var t = today(), from = addDays(t, -6), name = S.settings.name;
+  var month = ui.period === 'mois', t = today(), from = addDays(t, month ? -29 : -6), name = S.settings.name;
   var inWeek = function (s) { return s && diff(from, s) >= 0 && diff(s, t) >= 0; };
   var cIds = {}; S.contacts.forEach(function (c) { if (inWeek(c.date)) cIds[c.personId] = 1; });
   var contacted = Object.keys(cIds).map(person).filter(Boolean);
@@ -1229,13 +1297,14 @@ function V_bilan() {
   var bal = debts.reduce(function (a, i) { return a + (i.dir === 'on_me_doit' ? 1 : -1) * remaining(i); }, 0);
   var up = upcoming(14).filter(function (u) { return u.kind !== 'sparkle'; });
   var s = [];
-  s.push((overdue.length ? 'Voici votre semaine' : 'Belle semaine') + (name ? ' ' + name : '') + '.');
-  s.push(contacted.length ? 'Vous avez pris des nouvelles de ' + plural(contacted.length, 'proche') + '.' : "Vous n'avez noté aucun contact avec vos proches cette semaine.");
+  s.push((overdue.length ? 'Voici votre ' + (month ? 'mois' : 'semaine') : (month ? 'Beau mois' : 'Belle semaine')) + (name ? ' ' + name : '') + '.');
+  s.push(contacted.length ? 'Vous avez pris des nouvelles de ' + plural(contacted.length, 'proche') + '.' : "Vous n'avez noté aucun contact avec vos proches " + (month ? 'ce mois-ci.' : 'cette semaine.'));
   if (doneItems.length) s.push('Vous avez bouclé ' + plural(doneItems.length, 'élément') + '.');
   s.push(overdue.length ? (overdue.length === 1 ? 'Un seul point en retard : ' + overdue[0].title.toLowerCase() + '.' : overdue.length + ' points sont en retard, dont ' + overdue[0].title.toLowerCase() + '.') : 'Aucun retard. Bravo.');
   if (waiting.length) s.push(waiting.slice(0, 2).map(function (p) { return p.name; }).join(' et ') + (waiting.length > 2 ? ' et d\'autres' : '') + (waiting.length > 1 ? ' attendent' : ' attend') + ' de vos nouvelles.');
   if (up.length) s.push('Pensez aussi à : ' + up[0].label.toLowerCase().replace(/ \(date à confirmer\)/, '') + ', ' + rel(up[0].date).toLowerCase() + '.');
   var h = '<div class="screen"><div class="row"><button type="button" class="iconbtn" data-act="back" aria-label="Retour">' + ic('back') + '</button><div class="stack" style="gap:0"><span class="small muted">Du ' + esc(fmt(from)) + ' au ' + esc(fmt(t)) + '</span><h1 class="h1">Votre bilan</h1></div></div>';
+  h += '<div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr))" role="group" aria-label="Période"><button type="button" aria-pressed="' + !month + '" data-act="ui" data-k="period" data-v="">7 derniers jours</button><button type="button" aria-pressed="' + month + '" data-act="ui" data-k="period" data-v="mois">30 derniers jours</button></div>';
   h += '<section class="story"><div class="row between"><div class="eyebrow">En quelques mots</div><button type="button" class="iconbtn" data-act="speakBilan" aria-label="Écouter le bilan">' + ic('speaker') + '</button></div><p id="bilanText">' + esc(s.join(' ')) + '</p></section>';
   h += '<div class="stats3"><div class="stat"><span class="n">' + contacted.length + '</span><span class="tiny muted">proches contactés</span></div><div class="stat"><span class="n">' + doneItems.length + '</span><span class="tiny muted">éléments bouclés</span></div><div class="stat"><span class="n" style="color:' + (bal >= 0 ? 'var(--green-ink)' : 'var(--orange-ink)') + '">' + (bal > 0 ? '+' : '') + money(bal) + '</span><span class="tiny muted">solde des dettes</span></div></div>';
   if (waiting.length) h += '<section class="stack"><h2 class="h2">Ils attendent de vos nouvelles</h2><div class="list">' + waiting.slice(0, 5).map(function (p) { var sc = personScore(p); return '<button type="button" class="li" data-act="go" data-to="person" data-id="' + p.id + '"><span class="av">' + esc(initials(p.name)) + '</span><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(p.name) + '</span><span class="sub">' + sc.since + ' j sans nouvelles</span></span>' + ic('chev', 18) + '</button>'; }).join('') + '</div></section>';
@@ -1307,7 +1376,7 @@ function V_about() {
     }
   }
   h += '</section>';
-  h += '<section class="card"><h2 class="h2">Nouveautés</h2><div class="stack small"><p><b>Version ' + VERSION + '</b></p><p>Application Android : rappels même app fermée et sans internet, avec « C\'est fait » et « Demain » dans la notification. Point du matin et bilan du lundi. Import des contacts du téléphone. Contact noté automatiquement après un appel. Messages prêts pour WhatsApp. Remboursements partiels. Verrouillage par code ou empreinte. Tontines. Registre des dons. Engagements récurrents.</p><p><b>Version 0.1</b></p><p>Score de priorité expliqué, proches et cercles, engagements et dettes, routines de veille, bilan de la semaine, export agenda, jour de repos.</p><p class="muted">Prochainement : widget d\'écran d\'accueil, sauvegarde Google Drive, saisie à la voix.</p></div></section>';
+  h += '<section class="card"><h2 class="h2">Nouveautés</h2><div class="stack small"><p><b>Version ' + VERSION + '</b></p><p>Application Android : rappels même app fermée et sans internet, avec « C\'est fait » et « Demain » dans la notification. Point du matin et bilan du lundi. Import des contacts du téléphone. Contact noté automatiquement après un appel. Messages prêts pour WhatsApp. Remboursements partiels. Verrouillage par code ou empreinte. Tontines. Registre des dons. Engagements récurrents.</p><p><b>Version 0.1</b></p><p>Score de priorité expliqué, proches et cercles, engagements et dettes, routines de veille, bilan de la semaine, export agenda, jour de repos.</p></div></section>';
   h += '<p class="tiny muted" style="text-align:center"><a href="https://bestsupport.mrdnej.com/confidentialite.html" target="_blank" rel="noopener">Confidentialité</a> · <a href="https://bestsupport.mrdnej.com/conditions.html" target="_blank" rel="noopener">Conditions d\'utilisation</a></p>';
   h += '<p class="tiny muted" style="text-align:center">Version ' + VERSION + ' · Conçue avec l\'aide de Claude</p>';
   return h + '</div>';
@@ -1370,8 +1439,9 @@ function V_messages(p0) {
   var occ = ui.occ || (personScore(p).best && personScore(p).best.kind === 'bday' && personScore(p).U >= 40 ? 'anniv' : 'nouvelles');
   var h = '<div class="screen">' + head('Messages pour ' + p.name);
   h += '<div class="chips" role="group" aria-label="Occasion">' + Object.keys(MSG).map(function (k) { return '<button type="button" class="chip" aria-pressed="' + (occ === k) + '" data-act="msgOcc" data-v="' + k + '">' + MSG[k].label + '</button>'; }).join('') + '</div>';
-  h += MSG[occ].list.map(function (tpl, i) {
-    var txt = fillMsg(tpl, p), id = 'msg' + i;
+  if (occ === 'anniv' && giftMemo(p)) h += '<div class="note">' + ic('heart', 18) + '<span>' + esc(giftMemo(p)) + '.</span></div>';
+  h += (MSG[occ].dyn ? relanceTexts(p) : MSG[occ].list).map(function (tpl, i) {
+    var txt = MSG[occ].dyn ? tpl : fillMsg(tpl, p), id = 'msg' + i;
     return '<section class="card"><p id="' + id + '" style="line-height:1.55">' + esc(txt) + '</p><div class="grid2">' +
       '<a class="btn btn-green" href="' + esc(waNum(p) ? waLink(waNum(p), txt) : 'https://wa.me/?text=' + encodeURIComponent(txt)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' WhatsApp</a>' +
       '<button type="button" class="btn btn-ghost" data-act="copyMsg" data-target="' + id + '">' + ic('copy', 18) + ' Copier</button></div></section>';
@@ -1701,6 +1771,7 @@ function voiceAvailableWeb() { return !!(window.SpeechRecognition || window.webk
 function startVoice(presetPid) {
   var done = function (text) {
     if (!text) { toast("Je n'ai rien entendu. Réessayez."); return; }
+    if (!presetPid && voiceCommand(text)) return;
     var r = parseSpeech(text);
     if (presetPid && !r.personId) r.personId = presetPid;
     F = Object.assign({ _init: 1, place: '', notes: '', remindEve: true, remindDay: true, recur: '' }, r, { heard: text });
@@ -1767,6 +1838,7 @@ function speechText(t) {
   t = t.replace(/\b(\d{1,2}) ?h\b/g, function (m, h) { return Number(h) + (Number(h) > 1 ? ' heures' : ' heure'); });
   t = t.replace(/\b(lun|mar|mer|jeu|ven|sam|dim)\.(?=\s+\d)/g, function (m, d) { return WD_FULL[d]; });
   t = t.replace(/(\d{1,2}|1er)\s+(janv|févr|avr|juil|sept|oct|nov|déc)\./g, function (m, n, mo) { return n + ' ' + MO_FULL[mo]; });
+  t = t.replace(/\b(\d+) j\b/g, function (m, n) { return n + (n === '1' ? ' jour' : ' jours'); });
   t = t.replace(/\b1er\b/g, 'premier').replace(/\bM\.\s(?=[A-ZÀ-Ý])/g, 'Monsieur ').replace(/\bMme\b\.?/g, 'Madame').replace(/\bMlle\b\.?/g, 'Mademoiselle');
   t = t.replace(/\brdv\b/gi, 'rendez-vous').replace(/\bsvp\b/gi, "s'il vous plaît").replace(/\btél\.?\s/gi, 'téléphone ').replace(/\bn°\s?/gi, 'numéro ').replace(/\bex\.\s/g, 'par exemple ').replace(/\betc\.?/g, 'et cetera');
   t = t.replace(/(\d)\s?%/g, '$1 pour cent').replace(/\s&\s/g, ' et ').replace(/\s[·•|\/]\s/g, ', ').replace(/[·•]/g, ', ').replace(/[«»"“”]/g, '').replace(/…/g, '.');
@@ -1796,6 +1868,88 @@ function briefText() {
   else { s += (L.length === 1 ? 'Vous avez une priorité aujourd\'hui. ' : 'Vous avez ' + L.length + ' priorités aujourd\'hui. ') + L.slice(0, 4).map(function (e, i) { return ['Un', 'Deux', 'Trois', 'Quatre'][i] + ' : ' + e.title + '.'; }).join(' '); }
   var pp = prepsForTonight(); if (pp.length) s += ' Ce soir, préparez : ' + pp[0].title + '.';
   return s;
+}
+
+/* Commandes vocales : questions et actions */
+function nrm(x) { return ' ' + String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, "'") + ' '; }
+function openItemsBetween(a, b) { return S.items.filter(function (i) { return !i.done && i.due && diff(a, i.due) >= 0 && diff(i.due, b) >= 0; }).sort(function (x, y) { return x.due < y.due ? -1 : 1; }); }
+function itemLine(i) { var pp = i.personId ? person(i.personId) : null; return i.title + (pp && i.title.indexOf(pp.name) < 0 ? ' (' + pp.name + ')' : '') + (i.type === 'dette' && i.amount ? ', ' + money(remaining(i)) : '') + ', ' + rel(i.due).toLowerCase(); }
+function findItemFor(text, debtFirst) {
+  var t = nrm(text), pp = matchPersonInText(text), STOP = /^(reporte|reporter|decale|decaler|repousse|repousser|deplace|deplacer|payee|paye|payer|dette|dettes|rembourse|remboursee|marque|marquer|comme|fait|faite|termine|terminee|regle|reglee|note|noter|avec|pour|cette|semaine|demain|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|prochain|prochaine|mets|celle|celui)$/,
+    words = t.split(/[^a-z0-9]+/).filter(function (w) { return w.length > 3 && !STOP.test(w); });
+  var best = null, bs = 0;
+  S.items.forEach(function (i) {
+    if (i.done) return; var sc = 0;
+    if (pp && i.personId === pp.id) sc += 5;
+    if (pp && nrm(i.title).indexOf(nrm(pp.name).trim()) >= 0) sc += 4;
+    var ti = nrm(i.title); words.forEach(function (w) { if (ti.indexOf(w) >= 0) sc += 2; });
+    if (debtFirst && i.type === 'dette') sc += 2;
+    if (sc > bs) { bs = sc; best = i; }
+  });
+  return bs >= 2 ? best : null;
+}
+function voiceCommand(text) {
+  var t = nrm(text), td = today(), ans = '', rows = [];
+  var show = function (title, a, list) { F = {}; stack.push(view); view = { name: 'vanswer', p: {} }; ui = { va: { heard: text, title: title, text: a, rows: list || [] } }; render(); window.scrollTo(0, 0); speak(a); return true; };
+  var confirm = function (kind, it, extra) { F = {}; stack.push(view); view = { name: 'vconfirm', p: {} }; ui = { vc: { heard: text, kind: kind, id: it.id, due: extra || '' } }; render(); window.scrollTo(0, 0); return true; };
+  // Appeler quelqu'un
+  var m = t.match(/^ (appelle|appeler|telephone a|telephoner a|appel) (.+)$/);
+  if (m) { var pc = matchPersonInText(text); if (pc && personTel(pc)) { toast('Appel de ' + pc.name + '…'); window.location.href = telLink(personTel(pc)); return true; } }
+  // Marquer comme payé / fait
+  if (/(m'a (rembourse|paye|rendu|donne)|j'ai (rembourse|paye|regle|fini|termine|fait)|(est|c'est|a ete|marque|marquer|mets|note|noter)( la| le| comme| que)*.*(paye|rembourse|regle|fait|termine))/.test(t)) {
+    var it = findItemFor(text, /pay|rembours|regl|rendu/.test(t));
+    if (it) return confirm('done', it);
+    return show("Je n'ai pas trouvé", "Je n'ai pas trouvé l'élément concerné. Dites par exemple : la dette de Koffi est payée.", []);
+  }
+  // Reporter
+  if (/^ (reporte|reporter|decale|decaler|repousse|repousser|deplace|deplacer) /.test(t)) {
+    var it2 = findItemFor(text, false), r = parseSpeech(text);
+    if (it2) return confirm('move', it2, r.due);
+  }
+  // Questions
+  var isQ = /\?|^ (qu'est-ce|qu'est ce|quoi|quel|quelle|quels|quelles|qui|combien|est-ce|c'est quoi|dis-moi|dis moi|rappelle-moi ce|lis|resume|j'ai quoi|ai-je|mes |liste)/.test(t) || / (qu'est-ce que je|qu'est ce que je) /.test(t);
+  if (!isQ) return false;
+  if (/qui me doit|on me doit|me doivent|recuperer/.test(t)) {
+    var ds = S.items.filter(function (i) { return i.type === 'dette' && !i.done && i.dir === 'on_me_doit'; }), tot = ds.reduce(function (a, i) { return a + remaining(i); }, 0);
+    ans = ds.length ? 'On vous doit ' + money(tot) + ' au total. ' + ds.slice(0, 5).map(function (i) { var pp = person(i.personId); return (pp ? pp.name : i.title) + ' : ' + money(remaining(i)); }).join('. ') + '.' : "Personne ne vous doit d'argent pour l'instant.";
+    return show('Ce qu\'on vous doit', ans, ds.map(function (i) { return { id: i.id, t: (person(i.personId) || { name: i.title }).name, s: money(remaining(i)) + ' · ' + rel(i.due).toLowerCase() }; }));
+  }
+  if (/combien.*(je dois|dois-je)|mes dettes|je dois combien/.test(t)) {
+    var dj = S.items.filter(function (i) { return i.type === 'dette' && !i.done && i.dir !== 'on_me_doit'; }), tj = dj.reduce(function (a, i) { return a + remaining(i); }, 0);
+    ans = dj.length ? 'Vous devez ' + money(tj) + ' au total. ' + dj.slice(0, 5).map(function (i) { var pp = person(i.personId); return (pp ? pp.name : i.title) + ' : ' + money(remaining(i)); }).join('. ') + '.' : "Vous n'avez aucune dette enregistrée.";
+    return show('Ce que vous devez', ans, dj.map(function (i) { return { id: i.id, t: (person(i.personId) || { name: i.title }).name, s: money(remaining(i)) + ' · ' + rel(i.due).toLowerCase() }; }));
+  }
+  if (/anniversaire/.test(t)) {
+    var bl = S.people.filter(function (pp) { return pp.bday; }).map(function (pp) { return { p: pp, d: diff(td, nextBirthday(pp)) }; }).filter(function (x) { return x.d <= 30; }).sort(function (a, b) { return a.d - b.d; });
+    ans = bl.length ? bl.slice(0, 5).map(function (x) { return x.p.name + ', ' + rel(nextBirthday(x.p)).toLowerCase(); }).join('. ') + '.' : 'Aucun anniversaire dans les 30 prochains jours.';
+    return show('Anniversaires à venir', ans, bl.map(function (x) { return { pid: x.p.id, t: x.p.name, s: fmtLong(nextBirthday(x.p)) }; }));
+  }
+  if (/semaine|demain|aujourd'hui|ce soir|week-end|weekend|mois/.test(t) || /je dois|j'ai quoi|ai-je|programme|faire/.test(t)) {
+    var end = /mois/.test(t) ? addDays(td, 30) : /semaine|week/.test(t) ? addDays(td, 7) : /demain/.test(t) ? addDays(td, 1) : td;
+    var start = /demain/.test(t) && !/semaine/.test(t) ? addDays(td, 1) : addDays(td, -60);
+    var L = openItemsBetween(start, end);
+    var per = /mois/.test(t) ? 'ce mois-ci' : /semaine|week/.test(t) ? 'cette semaine' : /demain/.test(t) ? 'demain' : "aujourd'hui";
+    ans = L.length ? 'Vous avez ' + plural(L.length, 'élément') + ' ' + per + '. ' + L.slice(0, 6).map(itemLine).join('. ') + '.' : 'Rien de prévu ' + per + '. ' + (per === "aujourd'hui" ? briefText() : '');
+    return show('Votre programme ' + per, ans, L.map(function (i) { return { id: i.id, t: i.title, s: rel(i.due) + (i.type === 'dette' && i.amount ? ' · ' + money(remaining(i)) : '') }; }));
+  }
+  return show('Vos priorités', briefText(), priorities().list.slice(0, 6).map(function (e) { return { key: e.key, t: e.title, s: e.sub.split(' · ')[0] }; }));
+}
+function V_vanswer() {
+  var a = ui.va || { heard: '', title: '', text: '', rows: [] };
+  var h = '<div class="screen">' + head(a.title);
+  h += '<p class="small muted">Vous avez demandé : « ' + esc(a.heard) + ' »</p><section class="story"><div class="row between"><div class="eyebrow">Réponse</div><button type="button" class="iconbtn" data-act="speakVa" aria-label="Réécouter">' + ic('speaker') + '</button></div><p>' + esc(a.text) + '</p></section>';
+  if (a.rows.length) h += '<div class="list">' + a.rows.map(function (r) { return '<button type="button" class="li" ' + (r.id ? 'data-act="go" data-to="item" data-id="' + r.id + '"' : r.pid ? 'data-act="go" data-to="person" data-id="' + r.pid + '"' : 'data-act="openEntry" data-key="' + esc(r.key) + '"') + '><span class="grow stack" style="gap:2px"><span class="ttl">' + esc(r.t) + '</span><span class="sub">' + esc(r.s || '') + '</span></span>' + ic('chev', 18) + '</button>'; }).join('') + '</div>';
+  h += '<button type="button" class="btn btn-ghost btn-block" data-act="voice">' + ic('mic', 18) + ' Autre question</button>';
+  h += '<p class="tiny muted">Essayez : « Qu\'est-ce que je dois faire cette semaine ? », « Qui me doit de l\'argent ? », « La dette de Koffi est payée », « Reporte la réunion à lundi ».</p>';
+  return h + '</div>';
+}
+function V_vconfirm() {
+  var c = ui.vc || {}, it = item(c.id); if (!it) return V_missing();
+  var h = '<div class="screen nonav">' + head('Est-ce bien cela ?');
+  h += '<p class="small muted">Vous avez dit : « ' + esc(c.heard) + ' »</p>';
+  h += '<section class="card"><div class="eyebrow">' + (c.kind === 'done' ? (it.type === 'dette' ? 'Marquer comme réglée' : 'Marquer comme fait') : 'Reporter') + '</div><div class="h2">' + esc(it.title) + '</div><p class="small muted">' + esc(c.kind === 'move' ? 'Du ' + fmtLong(it.due).toLowerCase() + ' au ' + fmtLong(c.due).toLowerCase() : itemLine(it)) + '</p></section>';
+  h += '<div class="grid2"><button type="button" class="btn btn-green" data-act="vcOk">' + ic('check', 18) + ' Confirmer</button><button type="button" class="btn btn-ghost" data-act="back">Annuler</button></div>';
+  return h + '</div>';
 }
 
 /* Engagements dans un texte (appel transcrit, note vocale, note écrite) */
@@ -2160,6 +2314,8 @@ function V_coti(p0) {
   }).join('') + '</div>' +
     '<div class="row" style="align-items:flex-end"><div class="field grow"><label for="cp-new">Ajouter un participant</label><input class="in" id="cp-new" data-f="cpNew" value="' + esc(F.cpNew || '') + '" placeholder="Nom"></div><button type="button" class="btn btn-ghost" data-act="cotiAdd" data-id="' + c.id + '">Ajouter</button></div></section>';
   if (c.notes) h += '<section class="card"><h2 class="h2">Notes</h2><p>' + esc(c.notes) + '</p></section>';
+  if (parts.some(function (x, i) { return i !== me && !(Number(x.paid) > 0); })) { var cr = cotiReminder(c);
+    h += '<section class="card"><h2 class="h2">Rappeler la cotisation</h2><p class="small" style="line-height:1.55">' + esc(cr) + '</p><a class="btn btn-green btn-block" href="' + esc('https://wa.me/?text=' + encodeURIComponent(cr)) + '" target="_blank" rel="noopener">' + ic('send', 18) + ' Envoyer dans le groupe WhatsApp</a></section>'; }
   h += shareCard(c, 'cotisation');
   h += confirmBlock('delc', 'Supprimer la cotisation', 'Supprimer « ' + c.name + ' » ' + (c.gid ? 'de vos appareils ? Les autres membres la gardent.' : '?'), 'delCoti', c.id);
   return h + '</div>';
@@ -2212,6 +2368,7 @@ function initSync() {
     render();
   });
   if (N && N.App) N.App.addListener('appUrlOpen', function (ev) {
+    if (ev && ev.url && ev.url.indexOf('://voice') >= 0) { F = {}; stack = []; view = { name: 'home', p: {} }; render(); setTimeout(function () { startVoice(); }, 350); return; }
     if (ev && ev.url && ev.url.indexOf('after-call') >= 0) {
       var q = {}; (ev.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); });
       F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: { pid: q.pid || '', n: q.n || '', d: q.d || '' } }; ui = {}; render(); window.scrollTo(0, 0);
@@ -2307,6 +2464,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '0.9 bêta', items: ['Notifications plus utiles : « C\'est fait », « Demain » et « Appeler » directement', 'Point du matin : touchez « Écouter » pour l\'entendre', 'Relances polies sur WhatsApp, au tutoiement ou au vouvoiement selon la personne, et rappel de cotisation pour le groupe', 'Parlez à Best Support : « Qu\'est-ce que je dois faire cette semaine ? », « La dette de Koffi est payée »', 'Anniversaires : alerte 3 jours avant pour vos proches, avec le souvenir du dernier don', 'Vœux prêts pour Noël, le Nouvel An, Pâques, Tabaski et Korité', 'Widget : vos 3 priorités et un bouton micro', 'Bilan sur 7 ou 30 jours, et rappel mensuel de ceux qui attendent de vos nouvelles'] },
   { v: '0.8.2 bêta', items: ['Transcription en mode Automatique : Best Support choisit le modèle le plus précis que votre téléphone peut faire tourner rapidement'] },
   { v: '0.8.1 bêta', items: ['Note après appel activée d\'office (désactivable dans Paramètres), dès 2 secondes d\'appel avec un proche', 'Lecture à voix haute : la meilleure voix française de votre téléphone, dates, heures et montants bien prononcés', 'Choix de la voix et de la vitesse, avec un exemple à écouter', 'Transcription « Précis » par défaut, accélérée par la carte graphique quand le téléphone le permet'] },
   { v: '0.8 bêta', items: ['Après un appel avec un proche (Android) : une notification vous propose de noter une promesse, un rendez-vous ou une dette', 'Analyser un appel : enregistrement ou note vocale WhatsApp transcrit sur votre appareil, engagements détectés à valider', 'Partagez un fichier audio vers Best Support depuis WhatsApp ou votre enregistreur'] },
@@ -2359,7 +2517,7 @@ function V_lock() {
     (N && S.settings.lock === 'bio' ? '<button type="button" class="btn btn-ghost btn-block" data-act="bio">Utiliser l\'empreinte</button>' : '') + '</form></div>';
 }
 
-var VIEWS = { audio: V_audio, afterCall: V_afterCall, cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
+var VIEWS = { fete: V_fete, vanswer: V_vanswer, vconfirm: V_vconfirm, audio: V_audio, afterCall: V_afterCall, cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
 function navHtml() {
   var cur = TAB_OF[view.name] || '';
   var b = function (id, icon, label) { return '<button type="button" data-act="tab" data-to="' + id + '"' + (cur === id ? ' aria-current="page"' : '') + '>' + ic(icon, 22) + label + '</button>'; };
@@ -2385,6 +2543,8 @@ function openKey(key) {
   else if (a[0] === 'i' && item(a[1])) go('item', { id: a[1] });
   else if (a[0] === 't' && tontine(a[1])) go('tontine', { id: a[1], k: a[2] });
   else if (a[0] === 'c' && coti(a[1])) go('coti', { id: a[1] });
+  else if (a[0] === 'f') go('fete', { k: a[1] });
+  else if (a[0] === 'b') { go('bilan', {}); ui.period = 'mois'; render(); }
   else render();
 }
 function doDone(key) {
@@ -2465,6 +2625,12 @@ var ACT = {
   googleContacts: function () { startGoogleContacts(); },
   testVoice: function () { speak('Bonjour ' + (S.settings.name || '') + '. Mardi 3 novembre à 10h, mariage de Kouamé à Cocody. Pensez à remettre les 25 000 F CFA de la cotisation à M. Konan.'); },
   installVoices: function () { if (N && N.TextToSpeech && N.TextToSpeech.openInstall) N.TextToSpeech.openInstall().catch(function () { toast('Ouvrez Paramètres Android, puis Synthèse vocale.'); }); },
+  speakVa: function () { if (ui.va) speak(ui.va.text); },
+  vcOk: function () { var c = ui.vc || {}, it = item(c.id); if (!it) return; var msg;
+    if (c.kind === 'done') { if (it.type === 'dette') { it.payments = it.payments || []; var rem = remaining(it); if (rem > 0) it.payments.push({ date: today(), amount: rem }); } var nx = completeItem(it); msg = nx ? 'Fait. Prochaine fois : ' + fmtDM(nx.due) + '.' : 'C\'est noté : ' + it.title + '.'; }
+    else { it.due = c.due; msg = 'Reporté au ' + fmtLong(c.due).toLowerCase() + '.'; }
+    save(); stack = []; tab('home'); toast(msg); speak(msg); },
+  feteSent: function (d, el) { try { window.open(el.getAttribute('href'), '_blank'); } catch (e) { } var k = 'fete:' + d.k + ':' + today().slice(0, 4); S.checks[k] = S.checks[k] || []; if (S.checks[k].indexOf(d.id) < 0) S.checks[k].push(d.id); var pp = person(d.id); if (pp) markContact(pp); save(); setTimeout(render, 600); return 'keep'; },
   setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
   voiceFor: function (d) { startVoice(d.pid || ''); },
   nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
@@ -2725,7 +2891,7 @@ try { if (localStorage.getItem('bs-v081') !== '1') { localStorage.setItem('bs-v0
 if (N) {
   window.addEventListener('bsShared', handleShared);
   handleShared();
-  if (N.App.getLaunchUrl) N.App.getLaunchUrl().then(function (r) { if (r && r.url && r.url.indexOf('after-call') >= 0) { var q = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); }); stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: q }; render(); } }).catch(function () { });
+  if (N.App.getLaunchUrl) N.App.getLaunchUrl().then(function (r) { if (r && r.url && r.url.indexOf('://voice') >= 0) { setTimeout(function () { startVoice(); }, 600); return; } if (r && r.url && r.url.indexOf('after-call') >= 0) { var q = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); }); stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: q }; render(); } }).catch(function () { });
 }
 setInterval(function () { if (sbUser && !document.hidden) syncNow(false); }, 120000);
 if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }

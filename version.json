@@ -1,6 +1,6 @@
 {
-  "build": 14,
-  "version": "0.8.2 bêta",
+  "build": 15,
+  "version": "0.9 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Transcription automatique selon la puissance du téléphone, meilleure voix française."
+  "notes": "Parlez à Best Support, relances polies, vœux prêts, widget avec micro."
 }
