@@ -1,6 +1,6 @@
 {
-  "build": 19,
-  "version": "1.0 bêta",
+  "build": 20,
+  "version": "1.0.1 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Touchez et parlez : Best Support enregistre directement vos tâches et rendez-vous."
+  "notes": "L'assistant arrive aussi sur ordinateur."
 }

@@ -253,7 +253,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '1.0 bêta';
+var VERSION = '1.0.1 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -689,10 +689,12 @@ function notifState() {
   if (N) return nativePerm === 'granted' ? 'granted' : nativePerm === 'denied' ? 'denied' : 'default';
   try { return 'Notification' in window ? Notification.permission : 'unsupported'; } catch (e) { return 'unsupported'; }
 }
-function notify(title, body) {
+function notify(title, body, key, type) {
   try {
     if (notifState() !== 'granted') return;
-    if (swReg && swReg.showNotification) swReg.showNotification(title, { body: body, icon: 'icon-192.png', badge: 'icon-192.png', tag: title });
+    var tp = NOTIF_TYPES.filter(function (x) { return x.id === type; })[0], acts = tp ? tp.actions.filter(function (x) { return x.id !== 'call'; }).slice(0, 2).map(function (x) { return { action: x.id, title: x.title }; }) : [];
+    if (!type && key) acts = [{ action: 'done', title: "C'est fait" }, { action: 'later', title: 'Demain' }];
+    if (swReg && swReg.showNotification) swReg.showNotification(title, { body: body, icon: 'icon-192.png', badge: 'icon-192.png', tag: title, data: { key: key || '' }, actions: acts, requireInteraction: /^(C'est maintenant|Dans \d+ min)/.test(title) });
     else new Notification(title, { body: body, icon: 'icon-192.png' });
   } catch (e) { }
 }
@@ -716,8 +718,8 @@ function keyTel(key) {
 }
 function hashId(s) { var h = 0; for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return (Math.abs(h) % 2000000000) + 1; }
 function atTime(ds, h, m) { var d = parse(ds); d.setHours(h, m || 0, 0, 0); return d; }
-function buildSchedule() {
-  var out = [], now = new Date(), real = iso(now), eve = Number(S.settings.eveHour) || 19, mh = Number(S.settings.morningHour) || 7;
+function buildSchedule(since) {
+  var out = [], now = since || new Date(), real = iso(now), eve = Number(S.settings.eveHour) || 19, mh = Number(S.settings.morningHour) || 7;
   var restOf = function (ds) { return parse(ds).getDay() === Number(S.settings.restDay); };
   var add = function (key, date, title, body, entryKey, urgent, type) {
     if (date <= now) return;
@@ -731,6 +733,7 @@ function buildSchedule() {
     var d = addDays(real, i), tm = addDays(d, 1), dow = parse(tm).getDay();
     S.items.forEach(function (it) {
       if (it.done || !it.due) return;
+      var sz = S.snooze['i:' + it.id]; if (sz && diff(d, sz) > 0) return;
       if (it.due === tm && it.remindEve !== false) add('eve:' + it.id + ':' + tm, atTime(d, eve), 'Demain : ' + it.title, it.checklist && it.checklist.length ? 'Préparez : ' + it.checklist.join(', ') : 'Pensez-y dès ce soir.', 'i:' + it.id, false);
       var ins = S.settings.insist || 'forte', lead = Number(S.settings.lead) || 30, pp0 = it.personId ? person(it.personId) : null, who = pp0 && it.title.toLowerCase().indexOf(pp0.name.toLowerCase()) < 0 ? ' (' + pp0.name + ')' : '';
       if (it.due === d && it.remindDay !== false && !(it.time && Number(it.time.slice(0, 2)) < 10)) add('day:' + it.id + ':' + d, atTime(d, 8), "Aujourd'hui : " + it.title + who, (it.time ? 'À ' + it.time + '. ' : '') + itemReason(it, 0), 'i:' + it.id, true);
@@ -782,31 +785,33 @@ function scheduleNative() {
     });
   }).catch(function (e) { console.warn('schedule', e); });
 }
+var NOTIF_TYPES = [
+  { id: 'bs-entry', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }] },
+  { id: 'bs-entry-call', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }, { id: 'call', title: 'Appeler' }] },
+  { id: 'bs-msg', actions: [{ id: 'msg', title: 'Écrire' }, { id: 'call', title: 'Appeler' }] },
+  { id: 'bs-morning', actions: [{ id: 'listen', title: 'Écouter' }] },
+  { id: 'bs-fete', actions: [{ id: 'open', title: 'Voir les vœux' }] },
+  { id: 'bs-mood', actions: [{ id: 'mood_3', title: 'Bien' }, { id: 'mood_2', title: 'Moyen' }, { id: 'mood_1', title: 'Pas top' }] },
+  { id: 'bs-plain', actions: [] }];
+function onNotifAction(actionId, key) {
+  actionId = actionId || 'tap';
+ if (actionId === 'call' && key) { var tn = keyTel(key); if (tn) { setTimeout(function () { window.location.href = telLink(tn); }, 300); } else openKey(key); return; }
+    if (actionId === 'msg' && key) { var pm = person(key.split(':')[1]); if (pm) { F = {}; go('messages', { id: pm.id }); ui.occ = 'anniv'; render(); return; } }
+    if (actionId === 'listen') { tab('home'); setTimeout(function () { speak(briefText()); }, 400); return; }
+    if (key === 'm:') { tab('home'); return; }
+    if (actionId === 'done' && key) { doDone(key); save(); render(); toast("C'est noté. " + cheer()); return; }
+    if (/^mood_/.test(actionId || '')) { openMood(Number(actionId.slice(5))); return; }
+    if (key === 'mood:') { openMood(0); return; }
+    else if (actionId === 'later' && key) { S.snooze[key] = addDays(today(), 1); save(); }
+    else if (key) { openKey(key); return; }
+    render();
+}
 function initNative() {
   if (!N) return;
   var LN = N.LocalNotifications;
   try { LN.createChannel({ id: 'rappels', name: 'Rappels', description: 'Rappels de Best Support', importance: 4, visibility: 1, vibration: true }); } catch (e) { }
-  try { LN.registerActionTypes({ types: [
-    { id: 'bs-entry', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }] },
-    { id: 'bs-entry-call', actions: [{ id: 'done', title: "C'est fait" }, { id: 'later', title: 'Demain' }, { id: 'call', title: 'Appeler' }] },
-    { id: 'bs-msg', actions: [{ id: 'msg', title: 'Écrire' }, { id: 'call', title: 'Appeler' }] },
-    { id: 'bs-morning', actions: [{ id: 'listen', title: 'Écouter' }] },
-    { id: 'bs-fete', actions: [{ id: 'open', title: 'Voir les vœux' }] },
-    { id: 'bs-mood', actions: [{ id: 'mood_3', title: 'Bien' }, { id: 'mood_2', title: 'Moyen' }, { id: 'mood_1', title: 'Pas top' }] },
-    { id: 'bs-plain', actions: [] }] }); } catch (e) { }
-  LN.addListener('localNotificationActionPerformed', function (ev) {
-    var key = ev.notification && ev.notification.extra && ev.notification.extra.key;
-    if (ev.actionId === 'call' && key) { var tn = keyTel(key); if (tn) { setTimeout(function () { window.location.href = telLink(tn); }, 300); } else openKey(key); return; }
-    if (ev.actionId === 'msg' && key) { var pm = person(key.split(':')[1]); if (pm) { F = {}; go('messages', { id: pm.id }); ui.occ = 'anniv'; render(); return; } }
-    if (ev.actionId === 'listen') { tab('home'); setTimeout(function () { speak(briefText()); }, 400); return; }
-    if (key === 'm:') { tab('home'); return; }
-    if (ev.actionId === 'done' && key) { doDone(key); save(); toast("C'est noté. " + cheer()); }
-    if (/^mood_/.test(ev.actionId || '')) { openMood(Number(ev.actionId.slice(5))); return; }
-    if (key === 'mood:') { openMood(0); return; }
-    else if (ev.actionId === 'later' && key) { S.snooze[key] = addDays(today(), 1); save(); }
-    else if (key) { openKey(key); return; }
-    render();
-  });
+  try { LN.registerActionTypes({ types: NOTIF_TYPES }); } catch (e) { }
+  LN.addListener('localNotificationActionPerformed', function (ev) { onNotifAction(ev.actionId, ev.notification && ev.notification.extra && ev.notification.extra.key); });
   LN.checkPermissions().then(function (p) { nativePerm = p.display; render(); scheduleNative(); }).catch(function () { });
   checkExact();
   N.App.addListener('appStateChange', function (st) {
@@ -886,20 +891,17 @@ function tryBio() {
 
 function checkReminders() {
   if (N) return;
-  var now = new Date(), t = today(), h = now.getHours(), eve = Number(S.settings.eveHour) || 19, rest = isRestDay(), changed = false;
-  function fire(key, title, body, urgent) { if (S.fired[key]) return; if (rest && !urgent) return; S.fired[key] = t; changed = true; notify(title, body); }
-  if (h >= eve) {
-    var tm = addDays(t, 1), dow = parse(tm).getDay();
-    S.items.forEach(function (it) { if (!it.done && it.due === tm && it.remindEve !== false) fire('eve:' + it.id + ':' + tm, 'Demain : ' + it.title, it.checklist && it.checklist.length ? 'Préparez : ' + it.checklist.join(', ') : 'Pensez-y dès ce soir.'); });
-    S.routines.forEach(function (r) { if (r.on && Number(r.day) === dow) fire('r:' + r.id + ':' + tm, 'Demain : ' + r.title, 'Préparez : ' + r.checklist.join(', '), true); });
-    S.people.forEach(function (p) { if (nextBirthday(p) === tm) fire('bdeve:' + p.id + ':' + tm, 'Demain, anniversaire de ' + p.name, 'Préparez un message ou un appel.'); });
-  }
-  if (h >= 8) {
-    S.items.forEach(function (it) { if (!it.done && it.due === t && it.remindDay !== false) fire('day:' + it.id + ':' + t, "Aujourd'hui : " + it.title, itemReason(it, 0), true); });
-    S.people.forEach(function (p) { if (nextBirthday(p) === t) fire('bd:' + p.id + ':' + t, "C'est l'anniversaire de " + p.name, 'Un appel ou un message WhatsApp lui fera plaisir.', true); });
-  }
+  var now = Date.now(), t = today(), changed = false, list;
+  try { list = buildSchedule(new Date(now - 45 * 60000)); } catch (e) { return; }
+  list.forEach(function (n) {
+    var at = n.schedule.at.getTime(); if (at > now) return;
+    var k = 'n' + n.id; if (S.fired[k]) return;
+    S.fired[k] = t; changed = true;
+    if (notifState() === 'granted') notify(n.title, n.body, n.extra && n.extra.key, n.actionTypeId);
+    else if (!document.hidden) toast(n.title);
+  });
   for (var k in S.fired) if (diff(S.fired[k], t) > 10) { delete S.fired[k]; changed = true; }
-  if (changed) save();
+  if (changed) { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { } }
 }
 
 /* ---------- Données d'exemple ---------- */
@@ -1010,7 +1012,7 @@ function notifCard() {
   if (N && st === 'granted') return '<div class="note">' + ic('bell', 18) + '<span>Rappels activés. Ils arrivent même app fermée et sans internet.</span></div>';
   if (N && st === 'denied') return '<div class="note o">' + ic('bell', 18) + '<span>Notifications bloquées. Autorisez-les dans Réglages, Applications, Best Support.</span></div>';
   if (N) return '<div class="card"><div class="row"><div class="grow"><div class="ttl">Activer les rappels</div><div class="small muted">La veille au soir, le jour même et le point du matin.</div></div><button type="button" class="btn btn-green" data-act="askNotif">Activer</button></div></div>';
-  if (st === 'granted') return '<div class="note">' + ic('bell', 18) + '<span>Notifications activées. Vous serez prévenu la veille et le jour même.</span></div>';
+  if (st === 'granted') return '<div class="note">' + ic('bell', 18) + '<span>Notifications activées sur cet ordinateur. Elles arrivent tant que Best Support est ouvert (un onglet ou l\'application installée, même en arrière-plan). Sur le téléphone, elles arrivent même app fermée.</span></div>';
   if (st === 'unsupported' || EMBED) return '<div class="note o">' + ic('bell', 18) + "<span>Les notifications s'activent une fois l'app installée sur votre téléphone.</span></div>";
   if (st === 'denied') return '<div class="note o">' + ic('bell', 18) + '<span>Notifications bloquées. Autorisez-les dans les réglages du navigateur pour recevoir les rappels.</span></div>';
   return '<div class="card"><div class="row"><div class="grow"><div class="ttl">Activer les rappels</div><div class="small muted">La veille au soir et le jour même.</div></div><button type="button" class="btn btn-green" data-act="askNotif">Activer</button></div></div>';
@@ -1030,7 +1032,7 @@ function V_home() {
   var h = '<div class="screen">';
   h += '<div class="hello"><div class="stack" style="gap:4px"><h1 class="h1">' + (hourGreeting()) + (name ? ' ' + esc(name) : '') + '</h1><p class="muted">Voici vos priorités d\'aujourd\'hui</p></div>' +
     '<div class="row" style="gap:8px"><button type="button" class="iconbtn" data-act="speakBrief" aria-label="Écouter mes priorités">' + ic('speaker') + '</button><button type="button" class="iconbtn" data-act="go" data-to="search" aria-label="Rechercher">' + ic('search') + '</button></div></div>';
-  h += '<button type="button" class="talk" data-act="voice" aria-label="Parler à Best Support"><span class="m">' + ic('mic', 26) + '</span><span><b>Touchez et parlez</b><span class="s">Une tâche, un rendez-vous, une dette, une question : je m\'occupe du reste.</span></span></button>';
+  h += '<button type="button" class="talk" data-act="voice" aria-label="Parler à Best Support"><span class="m">' + ic('mic', 26) + '</span><span><b>Touchez et parlez</b><span class="s">Une tâche, un rendez-vous, une dette, une question : je m\'occupe du reste.' + (!N && FINE ? ' Raccourci clavier : M.' : '') + '</span></span></button>';
   h += '<div class="chips" role="group" aria-label="Ajout rapide"><button type="button" class="chip" data-act="go" data-to="personForm">+ Proche</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="dette">+ Dette</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="evenement">+ Évènement</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="tache">+ Tâche</button></div>';
   if (updateInfo) h += '<div class="note o">' + ic('download', 18) + '<span class="grow">Nouvelle version ' + esc(updateInfo.version || '') + ' disponible.</span><a class="btn-link" style="min-height:24px" href="' + esc(updateInfo.apk || 'https://bestsupport.mrdnej.com/downloads/BestSupport.apk') + '" target="_blank" rel="noopener">Télécharger</a></div>';
   if (surveyDue()) h += '<div class="note">' + ic('star', 18) + '<span class="grow">Une semaine avec Best Support : 3 questions rapides ?</span><button type="button" class="btn-link" style="min-height:24px" data-act="go" data-to="survey">Répondre</button></div>';
@@ -1840,7 +1842,7 @@ function parseSpeech(text) {
 }
 function voiceAvailableWeb() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
 /* Écoute continue : on parle librement, on touche « Terminé », Best Support s'occupe du reste */
-var LISTEN = null;
+var LISTEN = null, FINE = false; try { FINE = matchMedia('(pointer: fine)').matches; } catch (e) { }
 function listenUi() {
   var el = document.getElementById('listen'); if (!el || !LISTEN) return;
   var said = LISTEN.acc.concat(LISTEN.part ? [LISTEN.part] : []).join(' ').trim();
@@ -1852,7 +1854,7 @@ function openListen(presetPid) {
   var el = document.createElement('div'); el.id = 'listen'; el.className = 'listen'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Best Support vous écoute');
   var pp = presetPid ? person(presetPid) : null;
   el.innerHTML = '<div class="lt">' + (pp ? 'Note pour ' + esc(pp.name) : 'Best Support vous écoute') + '</div><div class="orb">' + ic('mic', 54) + '</div><div class="tx" aria-live="polite"></div>' +
-    '<p class="hint">Parlez naturellement, même longtemps. Exemples : « Cale un rendez-vous demain pour Maman à 15 h », « Koffi me rend 20 000 vendredi », « Qu\'est-ce que j\'ai cette semaine ? »</p>' +
+    '<p class="hint">' + (!N && FINE ? 'Entrée pour terminer, Échap pour annuler. ' : '') + 'Parlez naturellement, même longtemps. Exemples : « Cale un rendez-vous demain pour Maman à 15 h », « Koffi me rend 20 000 vendredi », « Qu\'est-ce que j\'ai cette semaine ? »</p>' +
     '<div class="bt"><button type="button" class="no" id="lsNo">Annuler</button><button type="button" class="ok" id="lsOk">Terminé</button></div>';
   document.body.appendChild(el);
   el.querySelector('#lsOk').onclick = function () { finishListen(true); };
@@ -2681,6 +2683,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '1.0.1 bêta', items: ['Sur ordinateur aussi : touchez et parlez (ou touche M), rappels insistants, prise de nouvelles le soir, boutons dans les notifications'] },
   { v: '1.0 bêta', items: ['Touchez et parlez : dites ce que vous avez en tête, aussi longtemps que vous voulez. Best Support enregistre directement vos tâches et rendez-vous, sans formulaire', 'Plusieurs choses d\'un coup : « Cale un rendez-vous demain pour Maman à 15 h, et puis rappelle-moi d\'acheter du pain »', 'Rappels plus insistants : 30 min avant, à l\'heure exacte, relances tant que ce n\'est pas fait (réglable)', 'Le soir, Best Support prend de vos nouvelles et vous répond avec bienveillance', 'Encouragements quand vous terminez une tâche'] },
   { v: '0.9.3 bêta', items: ['Le bandeau « Nouvelle version » disparaît dès que la mise à jour est installée, et affiche toujours la dernière version'] },
   { v: '0.9.2 bêta', items: ['Correction : l\'installation était bloquée par la sécurité de certains téléphones'] },
@@ -3101,9 +3104,17 @@ document.addEventListener('submit', function (e) { e.preventDefault(); var fn = 
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; render(); });
 if (!EMBED && 'serviceWorker' in navigator && location.protocol !== 'file:') {
   try { navigator.serviceWorker.register('sw.js').then(function (reg) { swReg = reg; }).catch(function () { }); } catch (e) { }
+  try { navigator.serviceWorker.addEventListener('message', function (ev) { if (ev.data && ev.data.bsAct) onNotifAction(ev.data.bsAct, ev.data.key || ''); }); } catch (e) { }
 }
 document.addEventListener('visibilitychange', function () { if (!document.hidden) { checkReminders(); if (['home', 'agenda', 'bilan', 'people'].indexOf(view.name) >= 0) render(); } });
-setInterval(checkReminders, 60000);
+setInterval(checkReminders, 30000);
+try { var qs = new URLSearchParams(location.search); if (qs.get('bsAct')) { var qa = qs.get('bsAct'), qk = qs.get('key') || ''; history.replaceState(null, '', location.pathname); setTimeout(function () { onNotifAction(qa, qk); }, 300); } } catch (e) { }
+document.addEventListener('keydown', function (e) {
+  var tg = e.target && e.target.tagName;
+  if (LISTEN) { if (e.key === 'Enter') { e.preventDefault(); finishListen(true); } else if (e.key === 'Escape') { e.preventDefault(); finishListen(false); } return; }
+  if (tg === 'INPUT' || tg === 'TEXTAREA' || tg === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey || locked) return;
+  if ((e.key === 'm' || e.key === 'M') && S.settings.onboarded) { e.preventDefault(); startVoice(); }
+});
 
 if (S.settings.onboarded && !S.settings.firstUse) { S.settings.firstUse = today(); save(); }
 if (S.settings.onboarded && S.settings.seenVersion !== VERSION) { S.settings.seenVersion = VERSION; save(); view = { name: 'news', p: {} }; }
@@ -3126,7 +3137,7 @@ if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
 flushOutbox();
 
 // exposé pour les tests
-window.__BS = { speechText: speechText, sync: syncNow, parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
+window.__BS = { checkReminders: checkReminders, speechText: speechText, sync: syncNow, parse: parseSpeech, personScore: personScore, priorities: priorities, ics: ics, gcal: gcal, holidays: holidays, easter: easter, S: function () { return S; } };
 })();
 </script>
 

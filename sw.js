@@ -1,6 +1,6 @@
 // Best Support : service worker
 // Réseau d'abord (toujours la dernière version si internet), copie locale si hors ligne.
-var CACHE = 'bestsupport-v1.0';
+var CACHE = 'bestsupport-v1.0.1';
 var SHELL = ['./', './index.html', './sb.js', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './apple-touch-icon.png',
   './fonts/plus-jakarta-sans-latin-400-normal.woff2', './fonts/plus-jakarta-sans-latin-600-normal.woff2', './fonts/plus-jakarta-sans-latin-700-normal.woff2', './fonts/plus-jakarta-sans-latin-800-normal.woff2'];
 
@@ -32,8 +32,11 @@ self.addEventListener('fetch', function (e) {
 });
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
+  var act = e.action || 'tap', key = (e.notification.data && e.notification.data.key) || '';
   e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
-    for (var i = 0; i < list.length; i++) { if ('focus' in list[i]) return list[i].focus(); }
-    return self.clients.openWindow('./');
+    for (var i = 0; i < list.length; i++) {
+      if ('focus' in list[i]) { list[i].postMessage({ bsAct: act, key: key }); return list[i].focus(); }
+    }
+    return self.clients.openWindow('./?bsAct=' + encodeURIComponent(act) + '&key=' + encodeURIComponent(key));
   }));
 });
