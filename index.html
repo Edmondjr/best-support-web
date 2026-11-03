@@ -219,6 +219,27 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 .mday.today span{background:var(--green-2);color:#fff;width:28px;height:28px;border-radius:14px;display:grid;place-items:center}
 .mday.sel{background:var(--orange-soft);outline:2px solid var(--orange)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.listen{position:fixed;inset:0;z-index:90;background:linear-gradient(180deg,#0B3D2E 0%,#082A20 100%);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(28px + env(safe-area-inset-top,0px)) 22px calc(28px + env(safe-area-inset-bottom,0px));gap:18px}
+.listen .lt{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#A7D7C2;font-weight:800}
+.listen .orb{width:132px;height:132px;border-radius:50%;background:#E36A00;display:grid;place-items:center;box-shadow:0 0 0 0 rgba(227,106,0,.55);animation:orb 1.6s ease-out infinite}
+.listen .orb svg{width:54px;height:54px}
+@keyframes orb{0%{box-shadow:0 0 0 0 rgba(227,106,0,.55)}100%{box-shadow:0 0 0 38px rgba(227,106,0,0)}}
+.listen .tx{width:100%;max-width:480px;min-height:120px;max-height:38vh;overflow:auto;font-size:21px;line-height:1.45;font-weight:600;text-align:center}
+.listen .tx i{color:#A7D7C2;font-style:normal;font-weight:500}
+.listen .hint{font-size:13px;color:#C9E3D7;text-align:center;line-height:1.5;max-width:360px}
+.listen .bt{display:flex;gap:12px;width:100%;max-width:420px}
+.listen .bt button{flex:1;min-height:56px;border-radius:16px;font-weight:800;font-size:17px;border:0;font-family:inherit}
+.listen .ok{background:#fff;color:#0B3D2E}.listen .no{background:rgba(255,255,255,.12);color:#fff}
+@media (prefers-reduced-motion:reduce){.listen .orb{animation:none}}
+.talk{display:flex;align-items:center;gap:14px;width:100%;border:0;border-radius:20px;padding:16px;background:var(--green);color:#fff;text-align:left;font-family:inherit;min-height:76px;cursor:pointer}
+.talk .m{width:52px;height:52px;border-radius:50%;background:#E36A00;display:grid;place-items:center;flex:none}
+.talk b{font-size:17px;display:block}.talk span.s{font-size:13px;color:#C9E3D7}
+.moodb{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.moodb button{min-height:92px;border-radius:18px;border:2px solid var(--line);background:var(--surface);color:var(--fg);font-weight:800;font-size:15px;font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.moodb button[aria-pressed="true"]{border-color:var(--green-2);background:var(--green-soft)}
+.moodb .e{font-size:30px;line-height:1}
+.breath{width:150px;height:150px;border-radius:50%;background:var(--green-soft);margin:6px auto;display:grid;place-items:center;font-weight:800;color:var(--green-ink);animation:breath 12s ease-in-out infinite}
+@keyframes breath{0%,100%{transform:scale(.72)}33%{transform:scale(1)}66%{transform:scale(1)}}
 </style>
 
 </head>
@@ -232,7 +253,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '0.9.3 bêta';
+var VERSION = '1.0 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -338,7 +359,7 @@ function defaultRoutine() {
   return { id: 'culte', title: 'Culte du dimanche', day: 0, time: '09:00', on: true, checklist: ['Tenue repassée', 'Bible', 'Offrande', 'Transport prévu'] };
 }
 function fresh() {
-  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: true, asrModel: 'auto', voice: '', voiceRate: 0.95, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
+  return { v: 2, settings: { name: '', restDay: 0, eveHour: 19, onboarded: false, support: '', theme: '', morning: true, morningHour: 7, weekly: true, callSync: false, callSince: 0, afterCall: true, asrModel: 'auto', insist: 'forte', lead: 30, checkin: true, checkinHour: 21, voice: '', voiceRate: 0.95, lock: 'none', pinHash: '', zoom: 1, reportBtn: true, calIds: [], firstUse: '', seenVersion: '', surveyDone: false, lastUpdateCheck: 0 }, people: [], items: [], contacts: [], routines: [defaultRoutine()], tontines: [], gifts: [], cotis: [], feedback: [], tester: null, fired: {}, checks: {}, snooze: {}, demo: false };
 }
 function load() {
   try { var raw = localStorage.getItem(KEY); if (raw) { var s = JSON.parse(raw); var f = fresh(); for (var k in f) if (s[k] == null) s[k] = f[k]; for (var k2 in f.settings) if (s.settings[k2] == null) s.settings[k2] = f.settings[k2]; (s.people || []).forEach(function (p) { if (!p.phones) p.phones = p.phone ? [{ n: p.phone, label: 'appel' }] : []; }); return s; } } catch (e) { }
@@ -364,7 +385,7 @@ function waNum(p) { var ps = phonesOf(p); var a = ps.filter(function (x) { retur
 function numKey(n) { return String(n || '').replace(/\D/g, '').slice(-8); }
 function personByNumber(n) { var k = numKey(n); if (k.length < 8) return null; for (var i = 0; i < S.people.length; i++) if (phonesOf(S.people[i]).some(function (x) { return numKey(x.n) === k; })) return S.people[i]; return null; }
 function matchPersonInText(text) {
-  var t = ' ' + String(text || '').toLowerCase() + ' ', best = null;
+  var t = ' ' + String(text || '').toLowerCase().replace(/\bma m[eè]re\b|\bmama\b|\bmaman ch[ée]rie\b/g, 'maman').replace(/\bmon p[eè]re\b|\bpapy\b/g, 'papa') + ' ', best = null;
   S.people.forEach(function (p) { var n = p.name.toLowerCase().trim(); if (n.length >= 3 && t.indexOf(n) >= 0 && (!best || n.length > best.name.length)) best = p; });
   if (!best) S.people.forEach(function (p) { var first = p.name.toLowerCase().replace(/^(tante|tonton|oncle|m\.|mme|maman|papa)\s+/, '').split(/\s+/)[0]; if (first && first.length >= 3 && new RegExp('[^a-zà-ÿ]' + first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^a-zà-ÿ]').test(t) && !best) best = p; });
   return best;
@@ -711,7 +732,18 @@ function buildSchedule() {
     S.items.forEach(function (it) {
       if (it.done || !it.due) return;
       if (it.due === tm && it.remindEve !== false) add('eve:' + it.id + ':' + tm, atTime(d, eve), 'Demain : ' + it.title, it.checklist && it.checklist.length ? 'Préparez : ' + it.checklist.join(', ') : 'Pensez-y dès ce soir.', 'i:' + it.id, false);
-      if (it.due === d && it.remindDay !== false) add('day:' + it.id + ':' + d, atTime(d, 8), "Aujourd'hui : " + it.title, itemReason(it, 0), 'i:' + it.id, true);
+      var ins = S.settings.insist || 'forte', lead = Number(S.settings.lead) || 30, pp0 = it.personId ? person(it.personId) : null, who = pp0 && it.title.toLowerCase().indexOf(pp0.name.toLowerCase()) < 0 ? ' (' + pp0.name + ')' : '';
+      if (it.due === d && it.remindDay !== false && !(it.time && Number(it.time.slice(0, 2)) < 10)) add('day:' + it.id + ':' + d, atTime(d, 8), "Aujourd'hui : " + it.title + who, (it.time ? 'À ' + it.time + '. ' : '') + itemReason(it, 0), 'i:' + it.id, true);
+      if (it.due === d && it.time && ins !== 'douce') {
+        var hm = it.time.split(':'), tAt = atTime(d, Number(hm[0]), Number(hm[1]));
+        add('pre:' + it.id + ':' + d, new Date(tAt.getTime() - lead * 60000), 'Dans ' + lead + ' min : ' + it.title + who, 'À ' + it.time + (it.place ? ', ' + it.place : '') + '. Préparez-vous.', 'i:' + it.id, true);
+        add('at:' + it.id + ':' + d, tAt, "C'est maintenant : " + it.title + who, it.place ? it.place : 'Touchez « C\'est fait » une fois terminé.', 'i:' + it.id, true);
+      }
+      if (it.due === d && !it.time && ins === 'forte') {
+        add('noon:' + it.id + ':' + d, atTime(d, 13), "N'oubliez pas : " + it.title + who, 'Encore à faire aujourd\'hui.', 'i:' + it.id, false);
+        add('pm:' + it.id + ':' + d, atTime(d, 18, 30), 'Toujours à faire : ' + it.title + who, 'Il reste un peu de temps aujourd\'hui. Ou touchez « Demain ».', 'i:' + it.id, false);
+      }
+      if (ins === 'forte' && diff(it.due, d) >= 1 && diff(it.due, d) <= 3) add('late:' + it.id + ':' + d, atTime(d, 9), 'En retard : ' + it.title + who, 'Prévu ' + rel(it.due).toLowerCase() + '. Une minute pour le faire, ou le reporter ?', 'i:' + it.id, false);
     });
     S.people.forEach(function (p) {
       if (!p.bday) return;
@@ -727,13 +759,15 @@ function buildSchedule() {
     });
     if (S.settings.morning !== false && !restOf(d)) {
       NOW_OVERRIDE = d; var pr = priorities(); NOW_OVERRIDE = null;
-      if (pr.list.length) add('m:' + d, atTime(d, mh), (pr.list.length === 1 ? '1 priorité' : pr.list.length + ' priorités') + " aujourd'hui", pr.list.slice(0, 3).map(function (e) { return e.title; }).join(' · '), 'm:', false, 'bs-morning');
+      var HELLO = ['Belle journée à vous.', 'Vous allez y arriver.', 'Une chose à la fois.', 'Courage, on avance ensemble.', 'Prenez soin de vous aujourd\'hui.'];
+      if (pr.list.length) add('m:' + d, atTime(d, mh), (pr.list.length === 1 ? '1 priorité' : pr.list.length + ' priorités') + " aujourd'hui", pr.list.slice(0, 3).map(function (e) { return e.title; }).join(' · ') + '. ' + HELLO[parse(d).getDate() % 5], 'm:', false, 'bs-morning');
     }
     holidays(parse(tm).getFullYear()).forEach(function (hd) { var fk = feteKey(hd.label); if (fk && hd.date === tm) add('f:' + fk + ':' + tm, atTime(d, eve), 'Demain : ' + hd.label.replace(/ \(date à confirmer\)/, ''), 'Des vœux sont prêts pour vos proches, à envoyer sur WhatsApp en un geste.', 'f:' + fk, false, 'bs-fete'); });
+    if (S.settings.checkin !== false) { var MSGS = ['Un mot suffit. Best Support est là pour vous.', 'Prenez une seconde pour vous.', 'Votre journée compte aussi.']; add('ck:' + d, atTime(d, Number(S.settings.checkinHour) || 21), 'Comment vous sentez-vous ce soir ?', MSGS[parse(d).getDate() % 3], 'mood:', true, 'bs-mood'); }
     if (S.settings.weekly !== false && d.slice(8) === '01') add('mo:' + d, atTime(d, mh, 45), 'Votre mois avec vos proches', 'Qui vous avez vu, qui attend de vos nouvelles : votre bilan du mois est prêt.', 'b:mois', false, 'bs-plain');
     if (S.settings.weekly !== false && parse(d).getDay() === 1) add('w:' + d, atTime(d, mh, 30), 'Votre bilan de la semaine est prêt', 'Voyez qui attend de vos nouvelles et ce qui arrive cette semaine.', null, false);
   }
-  return out.sort(function (a, b) { return a.schedule.at - b.schedule.at; }).slice(0, 150);
+  return out.sort(function (a, b) { return a.schedule.at - b.schedule.at; }).slice(0, 300);
 }
 function scheduleNative() {
   if (!N) return;
@@ -758,6 +792,7 @@ function initNative() {
     { id: 'bs-msg', actions: [{ id: 'msg', title: 'Écrire' }, { id: 'call', title: 'Appeler' }] },
     { id: 'bs-morning', actions: [{ id: 'listen', title: 'Écouter' }] },
     { id: 'bs-fete', actions: [{ id: 'open', title: 'Voir les vœux' }] },
+    { id: 'bs-mood', actions: [{ id: 'mood_3', title: 'Bien' }, { id: 'mood_2', title: 'Moyen' }, { id: 'mood_1', title: 'Pas top' }] },
     { id: 'bs-plain', actions: [] }] }); } catch (e) { }
   LN.addListener('localNotificationActionPerformed', function (ev) {
     var key = ev.notification && ev.notification.extra && ev.notification.extra.key;
@@ -765,7 +800,9 @@ function initNative() {
     if (ev.actionId === 'msg' && key) { var pm = person(key.split(':')[1]); if (pm) { F = {}; go('messages', { id: pm.id }); ui.occ = 'anniv'; render(); return; } }
     if (ev.actionId === 'listen') { tab('home'); setTimeout(function () { speak(briefText()); }, 400); return; }
     if (key === 'm:') { tab('home'); return; }
-    if (ev.actionId === 'done' && key) { doDone(key); save(); toast("C'est noté depuis la notification."); }
+    if (ev.actionId === 'done' && key) { doDone(key); save(); toast("C'est noté. " + cheer()); }
+    if (/^mood_/.test(ev.actionId || '')) { openMood(Number(ev.actionId.slice(5))); return; }
+    if (key === 'mood:') { openMood(0); return; }
     else if (ev.actionId === 'later' && key) { S.snooze[key] = addDays(today(), 1); save(); }
     else if (key) { openKey(key); return; }
     render();
@@ -899,7 +936,7 @@ function loadDemo() {
 function clearDemo() { S.people = []; S.items = []; S.contacts = []; S.tontines = []; S.gifts = []; S.checks = {}; S.snooze = {}; S.demo = false; }
 
 /* ---------- Navigation ---------- */
-var TAB_OF = { fete: 'people', vanswer: 'home', vconfirm: 'home', audio: 'people', cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
+var TAB_OF = { vdone: 'home', mood: 'home', fete: 'people', vanswer: 'home', vconfirm: 'home', audio: 'people', cotis: 'plus', coti: 'plus', cotiForm: 'plus', join: 'plus', search: 'home', calendars: 'agenda', home: 'home', people: 'people', person: 'people', messages: 'people', importContacts: 'people', agenda: 'agenda', item: 'agenda', plus: 'plus', bilan: 'plus', routines: 'plus', routine: 'plus', about: 'plus', settings: 'plus', gifts: 'plus', giftForm: 'plus', tontines: 'plus', tontine: 'plus', tontineForm: 'plus' };
 function go(name, p, replace) {
   if (!replace) stack.push(view);
   view = { name: name, p: p || {} }; ui = {};
@@ -993,7 +1030,8 @@ function V_home() {
   var h = '<div class="screen">';
   h += '<div class="hello"><div class="stack" style="gap:4px"><h1 class="h1">' + (hourGreeting()) + (name ? ' ' + esc(name) : '') + '</h1><p class="muted">Voici vos priorités d\'aujourd\'hui</p></div>' +
     '<div class="row" style="gap:8px"><button type="button" class="iconbtn" data-act="speakBrief" aria-label="Écouter mes priorités">' + ic('speaker') + '</button><button type="button" class="iconbtn" data-act="go" data-to="search" aria-label="Rechercher">' + ic('search') + '</button></div></div>';
-  h += '<div class="chips" role="group" aria-label="Ajout rapide"><button type="button" class="chip" data-act="voice" style="color:var(--orange-ink);border-color:var(--orange)">' + ic('mic', 16) + ' Dicter</button><button type="button" class="chip" data-act="go" data-to="personForm">+ Proche</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="dette">+ Dette</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="evenement">+ Évènement</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="tache">+ Tâche</button></div>';
+  h += '<button type="button" class="talk" data-act="voice" aria-label="Parler à Best Support"><span class="m">' + ic('mic', 26) + '</span><span><b>Touchez et parlez</b><span class="s">Une tâche, un rendez-vous, une dette, une question : je m\'occupe du reste.</span></span></button>';
+  h += '<div class="chips" role="group" aria-label="Ajout rapide"><button type="button" class="chip" data-act="go" data-to="personForm">+ Proche</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="dette">+ Dette</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="evenement">+ Évènement</button><button type="button" class="chip" data-act="go" data-to="itemForm" data-type="tache">+ Tâche</button></div>';
   if (updateInfo) h += '<div class="note o">' + ic('download', 18) + '<span class="grow">Nouvelle version ' + esc(updateInfo.version || '') + ' disponible.</span><a class="btn-link" style="min-height:24px" href="' + esc(updateInfo.apk || 'https://bestsupport.mrdnej.com/downloads/BestSupport.apk') + '" target="_blank" rel="noopener">Télécharger</a></div>';
   if (surveyDue()) h += '<div class="note">' + ic('star', 18) + '<span class="grow">Une semaine avec Best Support : 3 questions rapides ?</span><button type="button" class="btn-link" style="min-height:24px" data-act="go" data-to="survey">Répondre</button></div>';
   h += '<div class="beta"><b>BÊTA</b><span>De nouvelles améliorations arrivent régulièrement.</span></div>';
@@ -1434,6 +1472,8 @@ function V_settings() {
   if (!ui.asrPick && !ui.asrPicking) { ui.asrPicking = 1; var keep = S.settings.asrModel; S.settings.asrModel = 'auto'; pickAsrModel().then(function (k) { ui.asrPick = k; if (view.name === 'settings') render(); }); S.settings.asrModel = keep; }
   if (!VOICE_LIST && !ui.voicesLoading) { ui.voicesLoading = 1; loadVoices().then(function () { if (view.name === 'settings') render(); }); }
   var vl = VOICE_LIST || [], cur = pickVoice(vl), hasQ = vl.some(function (v) { return v.q >= 50; });
+  h += '<section class="card"><h2 class="h2">Insistance des rappels</h2><p class="small muted">' + ({ douce: 'Douce : la veille au soir et le matin même.', normale: 'Normale : en plus, ' + (S.settings.lead || 30) + ' min avant et à l\'heure exacte.', forte: 'Forte : en plus, relances à 13 h et 18 h 30 tant que ce n\'est pas fait, et les jours suivants si c\'est en retard.' })[S.settings.insist || 'forte'] + '</p><div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))" role="group" aria-label="Insistance">' + [['douce', 'Douce'], ['normale', 'Normale'], ['forte', 'Forte']].map(function (x) { return '<button type="button" aria-pressed="' + ((S.settings.insist || 'forte') === x[0]) + '" data-act="setInsist" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
+    switchRow('Me demander comment je vais, le soir à ' + (S.settings.checkinHour || 21) + ' h', S.settings.checkin !== false, 'setToggle', '', 'checkin') + '</section>';
   h += '<section class="card"><h2 class="h2">Lecture à voix haute</h2><p class="small muted">Best Support choisit la meilleure voix française de votre appareil. Vous pouvez en essayer d\'autres.</p>' +
     '<div class="field"><label for="s-voice">Voix</label><select class="in" id="s-voice">' + (vl.length ? vl.map(function (v) { return '<option value="' + esc(v.name) + '"' + (cur && cur.name === v.name ? ' selected' : '') + '>' + esc(v.label) + '</option>'; }).join('') : '<option value="">Voix française par défaut</option>') + '</select></div>' +
     '<div class="field"><label for="s-vrate">Vitesse</label><select class="in" id="s-vrate">' + [['0.85', 'Lente'], ['0.95', 'Normale'], ['1.05', 'Rapide']].map(function (x) { return '<option value="' + x[0] + '"' + (String(S.settings.voiceRate || 0.95) === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></div>' +
@@ -1772,8 +1812,10 @@ function parseSpeech(text) {
   else { for (var w = 0; w < 7; w++) { var rx = new RegExp('\\b' + WEEKDAYS[w] + '( prochain)?\\b'); if (rx.test(t)) { r.due = nextRoutineDate({ day: w }, addDays(td, 1)); cut.push(rx); break; } } }
   if (!r.due && (m = t.match(/\ble (\d{1,2})\b(?! ?h)/))) { var dd = parseInt(m[1], 10), cur = parse(td); var c2 = iso(new Date(cur.getFullYear(), cur.getMonth(), dd)); if (diff(td, c2) < 0) c2 = iso(new Date(cur.getFullYear(), cur.getMonth() + 1, dd)); r.due = c2; cut.push(m[0].trim()); }
   // heure
-  if ((m = t.match(/\b(a )?(\d{1,2}) ?(h|heures?)( ?(\d{2}))?\b/))) { r.time = pad(Math.min(23, parseInt(m[2], 10))) + ':' + (m[5] || '00'); cut.push(m[0].trim()); }
+  if ((m = t.match(/dans (\d+|une|un|deux|trois) (heures?|minutes?|min)\b/))) { var q = /\d/.test(m[1]) ? Number(m[1]) : (m[1] === 'deux' ? 2 : m[1] === 'trois' ? 3 : 1), at = new Date(Date.now() + q * (/^h/.test(m[2]) ? 3600000 : 60000)); r.due = iso(at); r.time = pad(at.getHours()) + ':' + pad(at.getMinutes()); cut.push(m[0].trim()); }
+  else if ((m = t.match(/\b(a )?(\d{1,2}) ?(h|heures?)( ?(\d{2}))?( (du matin|de l'apres-midi|de l'apres midi|du soir))?\b/))) { var hh = Math.min(23, parseInt(m[2], 10)); if (m[7] && /apres|soir/.test(m[7]) && hh < 12) hh += 12; r.time = pad(hh) + ':' + (m[5] || '00'); cut.push(m[0].trim()); }
   else if (/\bmidi\b/.test(t)) { r.time = '12:00'; cut.push(/a midi|midi/); }
+  if (!r.time && /ce soir/.test(t)) r.time = '19:00';
   // montant
   if ((m = t.match(/(\d+(?:[ .]\d{3})*)\s*(mille)?\s*(francs?|fcfa|cfa|f)\b/)) || (m = t.match(/(\d+(?:[ .]\d{3})*)\s*(mille)\b/))) {
     var v = parseInt(m[1].replace(/[ .]/g, ''), 10); if (m[2]) v *= 1000; r.amount = v; cut.push(m[0].trim());
@@ -1783,20 +1825,167 @@ function parseSpeech(text) {
   // type
   if (/rembours|dette|\bdoit\b|\bdois\b|prete|emprunt|recuperer|argent|\brend\b|rendre/.test(t) && r.amount) {
     r.type = 'dette'; r.dir = /me doit|m'a emprunte|lui ai prete|recuperer|me rembourse|me rend/.test(t) ? 'on_me_doit' : 'je_dois';
-  } else if (/mariage|funerailles|obseques|enterrement|bapteme|anniversaire|reunion|ceremonie|fete|messe|culte|\bdot\b|voyage|veillee|rendez-vous|rdv/.test(t)) {
+  } else if (/mariage|funerailles|obseques|enterrement|bapteme|anniversaire|reunion|ceremonie|fete|messe|culte|\bdot\b|voyage|veillee|rendez-vous|rendez vous|rdv|hopital|hôpital|medecin|docteur|consultation|entretien/.test(t)) {
     r.type = 'evenement'; r.checklistTxt = templateFor(t).join('\n');
   } else if (/promis|envoyer|appeler|passer voir|rendre|apporter|donner/.test(t)) r.type = 'engagement';
   // titre
-  var title = raw.replace(/^((bon|alors|donc|ok|okay|euh|ah|et puis|ensuite|aussi|et)[\s,]+)+/i, '').replace(/^(rappelle[- ]moi( de| d')?|rappelle[- ]moi que|note( que)?|il faut que je|je dois|n'oublie pas( de| d')?|penser a|pense a)\s*/i, '');
+  var title = raw.replace(/^((bon|alors|donc|ok|okay|euh|ah|et puis|ensuite|aussi|et|best support)[\s,]+)+/i, '').replace(/^(il faut |faut |je veux |j'aimerais |peux-tu |tu peux )?(cale[rz]?|programme[rz]?|planifie[rz]?|fixe[rz]?|mets|mettre|ajoute[rz]?|note[rz]?|enregistre[rz]?|cr[ée]e[rz]?|prends|prendre|inscris|inscrire)( moi)?\s+(un |une |le |la |les |l')?/i, '').replace(/^(rappelle[- ]moi( de| d')?|rappelle[- ]moi que|note( que)?|il faut que je|je dois|n'oublie pas( de| d')?|penser a|pense a)\s*/i, '');
   cut.forEach(function (c) { var rx = c instanceof RegExp ? new RegExp(c.source, 'i') : null; if (rx) { var nf = title.normalize('NFD').replace(/[̀-ͯ]/g, ''); var mm = nf.match(rx); if (mm) title = title.slice(0, mm.index) + title.slice(mm.index + mm[0].length); } else { var idx = title.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().indexOf(c); if (idx >= 0) title = title.slice(0, idx) + title.slice(idx + c.length); } });
   for (var k = 0; k < 3; k++) title = title.replace(/[\s,.!?…]+$/g, '').replace(/\s+(le|la|les|l'|à|a|de|d'|du|des|pour|ce|cette|et|avec)$/i, '');
   title = title.replace(/\s{2,}/g, ' ').replace(/\s+([,.])/g, '$1').replace(/^[\s,.]+|[\s,.]+$/g, '');
   r.title = title ? title.charAt(0).toUpperCase() + title.slice(1) : raw;
+  if (p) { var nx = p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); r.title = r.title.replace(new RegExp(nx, 'i'), p.name); }
   if (!r.due) r.due = addDays(td, 1);
   return r;
 }
 function voiceAvailableWeb() { return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
-function startVoice(presetPid) {
+/* Écoute continue : on parle librement, on touche « Terminé », Best Support s'occupe du reste */
+var LISTEN = null;
+function listenUi() {
+  var el = document.getElementById('listen'); if (!el || !LISTEN) return;
+  var said = LISTEN.acc.concat(LISTEN.part ? [LISTEN.part] : []).join(' ').trim();
+  el.querySelector('.tx').innerHTML = said ? esc(said) : '<i>' + (LISTEN.ready ? 'Je vous écoute…' : 'Un instant…') + '</i>';
+}
+function openListen(presetPid) {
+  if (LISTEN) return;
+  LISTEN = { acc: [], part: '', pid: presetPid || '', on: true, ending: false, last: Date.now(), ready: false };
+  var el = document.createElement('div'); el.id = 'listen'; el.className = 'listen'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Best Support vous écoute');
+  var pp = presetPid ? person(presetPid) : null;
+  el.innerHTML = '<div class="lt">' + (pp ? 'Note pour ' + esc(pp.name) : 'Best Support vous écoute') + '</div><div class="orb">' + ic('mic', 54) + '</div><div class="tx" aria-live="polite"></div>' +
+    '<p class="hint">Parlez naturellement, même longtemps. Exemples : « Cale un rendez-vous demain pour Maman à 15 h », « Koffi me rend 20 000 vendredi », « Qu\'est-ce que j\'ai cette semaine ? »</p>' +
+    '<div class="bt"><button type="button" class="no" id="lsNo">Annuler</button><button type="button" class="ok" id="lsOk">Terminé</button></div>';
+  document.body.appendChild(el);
+  el.querySelector('#lsOk').onclick = function () { finishListen(true); };
+  el.querySelector('#lsNo').onclick = function () { finishListen(false); };
+  listenUi();
+  if (N && N.SpeechRecognition) {
+    var SRN = N.SpeechRecognition;
+    var startSeg = function () { if (!LISTEN || !LISTEN.on) return; LISTEN.ending = false; LISTEN.last = Date.now(); SRN.start({ language: 'fr-FR', maxResults: 1, partialResults: true, popup: false }).then(function () { if (LISTEN) { LISTEN.ready = true; listenUi(); } }).catch(function () { }); };
+    var commit = function () { if (!LISTEN) return; if (LISTEN.part) { LISTEN.acc.push(LISTEN.part); LISTEN.part = ''; } listenUi(); };
+    SRN.requestPermissions().then(function () { return SRN.removeAllListeners(); }).then(function () {
+      SRN.addListener('partialResults', function (d) {
+        if (!LISTEN) return; var m = d && d.matches && d.matches[0]; if (m) { LISTEN.part = m; LISTEN.last = Date.now(); listenUi(); }
+        if (LISTEN.ending) { clearTimeout(LISTEN.rt); commit(); if (LISTEN.on) setTimeout(startSeg, 120); else if (LISTEN.done) LISTEN.done(); }
+      });
+      SRN.addListener('listeningState', function (d) {
+        if (!LISTEN) return;
+        if (d.status === 'started') { LISTEN.ready = true; LISTEN.last = Date.now(); listenUi(); return; }
+        LISTEN.ending = true; clearTimeout(LISTEN.rt);
+        LISTEN.rt = setTimeout(function () { if (!LISTEN) return; commit(); if (LISTEN.on) startSeg(); else if (LISTEN.done) LISTEN.done(); }, 1500);
+      });
+      startSeg();
+      LISTEN.wd = setInterval(function () { if (LISTEN && LISTEN.on && !LISTEN.ending && Date.now() - LISTEN.last > 7000) { commit(); startSeg(); } }, 2000);
+    }).catch(function (e) { closeListen(); toast('Micro indisponible. Autorisez le micro pour Best Support. (' + errMsg(e) + ')'); });
+    return;
+  }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { closeListen(); toast('La saisie vocale n\'est pas disponible dans ce navigateur. Essayez Chrome.'); return; }
+  try {
+    var rec = new SR(); rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = true; LISTEN.rec = rec;
+    rec.onstart = function () { if (LISTEN) { LISTEN.ready = true; listenUi(); } };
+    rec.onresult = function (ev) { if (!LISTEN) return; var fin = [], intr = ''; for (var i = 0; i < ev.results.length; i++) { if (ev.results[i].isFinal) fin.push(ev.results[i][0].transcript.trim()); else intr += ev.results[i][0].transcript; } LISTEN.base = LISTEN.base || []; LISTEN.acc = LISTEN.base.concat(fin); LISTEN.part = intr.trim(); listenUi(); };
+    rec.onend = function () { if (!LISTEN) return; if (LISTEN.on) { LISTEN.base = LISTEN.acc.slice(); try { rec.start(); } catch (e) { } } else if (LISTEN.done) LISTEN.done(); };
+    rec.onerror = function (ev) { if (ev.error === 'not-allowed') { closeListen(); toast('Autorisez le micro pour Best Support.'); } };
+    rec.start();
+  } catch (e) { closeListen(); toast('Saisie vocale indisponible ici.'); }
+}
+function closeListen() {
+  if (LISTEN) { clearInterval(LISTEN.wd); clearTimeout(LISTEN.rt); }
+  var el = document.getElementById('listen'); if (el) el.remove();
+  if (N && N.SpeechRecognition) { N.SpeechRecognition.removeAllListeners().catch(function () { }); }
+  LISTEN = null;
+}
+function finishListen(ok) {
+  if (!LISTEN) return; var L = LISTEN; L.on = false;
+  var fin = function () { if (!LISTEN) return; var text = L.acc.concat(L.part ? [L.part] : []).join(' ').replace(/\s+/g, ' ').trim(), pid = L.pid; closeListen(); if (ok) handleDictation(text, pid); };
+  L.done = fin;
+  var btn = document.getElementById('lsOk'); if (btn) { btn.textContent = 'Un instant…'; btn.disabled = true; }
+  if (N && N.SpeechRecognition) { N.SpeechRecognition.stop().catch(function () { }); setTimeout(fin, 1300); }
+  else if (L.rec) { try { L.rec.stop(); } catch (e) { } setTimeout(fin, 900); }
+  else fin();
+}
+var MOOD_RX = /\b(fatigu|epuis|crev|stress|angoiss|anxieu|triste|deprim|deprime|pas bien|pas le moral|seul|decourag|marre|ras le bol|perdu|deborde|submerge|malheureu|en colere|enerve|heureu|content|bien aujourd'hui|joie|soulag)/;
+function splitDictation(text) {
+  return String(text || '').split(/(?<=[.!?])\s+|\s+(?:et puis|ensuite|après ça|apres ca|et aussi|autre chose|deuxième chose|deuxieme chose|troisième chose|troisieme chose|par ailleurs|n'oublie pas non plus)\s+|[;\n]+/i).map(function (x) { return x.replace(/^[\s,.]+|[\s,.]+$/g, ''); }).filter(function (x) { return x.length > 5; });
+}
+var LAST_ADDED = [];
+function handleDictation(text, pid) {
+  if (!text) { toast("Je n'ai rien entendu. Réessayez, en parlant près du téléphone."); return; }
+  if (!pid && voiceCommand(text)) return;
+  var t = nrm(text), hasPlan = /demain|aujourd'hui|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|semaine|\d|heure|soir|matin|midi|rappel|rendez|rdv|appeler|payer|rembours|doit|dois|acheter|envoyer|passer|aller|faire|preparer|cotis|tontine|mariage|funerailles|bapteme|anniversaire|reunion/.test(t);
+  if (!pid && MOOD_RX.test(t) && !hasPlan) { openMood(/heureu|content|joie|soulag|bien aujourd'hui/.test(t) ? 3 : 1, text); return; }
+  var segs = splitDictation(text); if (!segs.length) segs = [text];
+  var made = [];
+  segs.forEach(function (sg) {
+    var r = parseSpeech(sg); if (!r.title || r.title.length < 2) return;
+    if (pid && !r.personId) r.personId = pid;
+    var rp = r.personId ? person(r.personId) : null;
+    if (r.type === 'dette' && r.amount && r.title.split(/\s+/).length <= 4) r.title = r.dir === 'on_me_doit' ? (rp ? rp.name + ' me rend ' : 'Récupérer ') + money(r.amount) : 'Rembourser ' + (rp ? rp.name + ' ' : '') + '(' + money(r.amount) + ')';
+    var it = { id: uid(), type: r.type, title: r.title, personId: r.personId || '', amount: r.type === 'dette' ? (Number(r.amount) || '') : '', dir: r.dir || 'je_dois', due: r.due || addDays(today(), 1), time: r.time || '', place: '', notes: 'Dicté : « ' + sg.slice(0, 300) + ' »', checklist: r.type === 'evenement' ? String(r.checklistTxt || '').split('\n').filter(Boolean) : [], remindEve: true, remindDay: true, recur: '', done: false, created: today() };
+    S.items.push(it); made.push(it);
+  });
+  if (!made.length) { toast("Je n'ai pas compris de tâche. Réessayez avec une date, par exemple « demain à 10 h »."); return; }
+  if (pid) { var pp = person(pid); if (pp) markContact(pp); }
+  save(); LAST_ADDED = made.map(function (x) { return x.id; });
+  F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'vdone', p: {} }; ui = { heard: text }; render(); window.scrollTo(0, 0);
+  speak('C\'est noté. ' + made.map(function (it) { return it.title + ', ' + whenLong(it) + '.'; }).join(' ') + ' ' + (made.length === 1 ? reminderPlan(made[0]) : 'Je vous les rappellerai.'));
+}
+function whenLong(it) { var d = diff(today(), it.due), dl = d === 0 ? "aujourd'hui" : d === 1 ? 'demain' : d === 2 ? 'après-demain' : fmtLong(it.due).toLowerCase().replace(/ \d{4}$/, ''); return dl + (it.time ? ' à ' + it.time.replace(':00', ' h').replace(':', ' h ') : ''); }
+function reminderPlan(it) {
+  var lead = Number(S.settings.lead) || 30, ins = S.settings.insist || 'forte';
+  if (it.time) { var a = parse(it.due); var hm = it.time.split(':'); a.setHours(Number(hm[0]), Number(hm[1]) - lead, 0, 0); return 'Je vous le rappellerai ' + (diff(today(), it.due) >= 1 ? 'la veille au soir, puis ' : '') + lead + ' minutes avant, à ' + pad(a.getHours()) + ' h ' + pad(a.getMinutes()) + ', et à l\'heure exacte.'; }
+  return 'Je vous le rappellerai ' + (diff(today(), it.due) >= 1 ? 'la veille au soir et ' : '') + 'le jour même à 8 h' + (ins === 'forte' ? ', puis encore à 13 h et 18 h 30 tant que ce n\'est pas fait' : '') + '.';
+}
+function V_vdone() {
+  var its = LAST_ADDED.map(item).filter(Boolean);
+  var h = '<div class="screen">' + head("C'est noté");
+  if (ui.heard) h += '<p class="small muted">Vous avez dit : « ' + esc(ui.heard) + ' »</p>';
+  h += its.length ? '<div class="stack" style="gap:12px">' + its.map(function (it) {
+    var pp = it.personId ? person(it.personId) : null;
+    return '<section class="card"><div class="row" style="gap:12px;align-items:flex-start"><span class="av o">' + ic(TYPES[it.type].icon) + '</span><span class="grow stack" style="gap:3px"><span class="ttl" style="font-weight:800;font-size:17px">' + esc(it.title) + '</span><span class="sub">' + esc([TYPES[it.type].label, pp ? pp.name : '', it.type === 'dette' && it.amount ? money(it.amount) : '', whenLong(it)].filter(Boolean).join(' · ')) + '</span><span class="tiny muted">' + esc(reminderPlan(it)) + '</span></span></div>' +
+      '<div class="grid2"><button type="button" class="btn btn-ghost" data-act="go" data-to="itemForm" data-id="' + it.id + '">' + ic('edit', 16) + ' Modifier</button><button type="button" class="btn btn-ghost" data-act="vdUndo" data-id="' + it.id + '">' + ic('x', 16) + ' Annuler</button></div></section>';
+  }).join('') + '</div>' : '<section class="card empty"><p class="small muted">Rien à afficher.</p></section>';
+  h += '<button type="button" class="talk" data-act="voice"><span class="m">' + ic('mic', 26) + '</span><span><b>Autre chose ?</b><span class="s">Touchez et parlez</span></span></button>';
+  return h + '</div>';
+}
+
+/* Comment vous sentez-vous ? */
+var MOOD_TXT = {
+  3: ['Ça fait vraiment plaisir à entendre. Gardez cette belle énergie, et pourquoi ne pas la partager avec quelqu\'un qui compte pour vous ?', 'Super ! Les bonnes journées méritent d\'être savourées. Merci de l\'avoir partagé.', 'Quelle bonne nouvelle. Vous avez bien travaillé pour en arriver là.'],
+  2: ['Merci de le dire. Une journée moyenne reste une journée traversée, et c\'est déjà beaucoup.', 'Pas toujours facile, mais vous avancez. Demain, une seule chose compte vraiment, le reste peut attendre.', 'Une journée en demi-teinte, ça arrive à tout le monde. Reposez-vous bien ce soir.'],
+  1: ['Je suis désolé que ce soit difficile en ce moment. Vous n\'avez pas à tout porter seul.', 'Merci de l\'avoir dit, ce n\'est pas rien. Une mauvaise journée ne dit rien de votre valeur.', 'C\'est dur aujourd\'hui, et c\'est normal de le ressentir. Prenez soin de vous ce soir.']
+};
+function openMood(v, heard) { F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'mood', p: {} }; ui = { heard: heard || '' }; if (v) setMood(v); else render(); window.scrollTo(0, 0); }
+function setMood(v) {
+  S.moods = S.moods || []; S.moods = S.moods.filter(function (m) { return m.date !== today(); }); S.moods.push({ date: today(), v: v }); if (S.moods.length > 120) S.moods = S.moods.slice(-120);
+  var pool = MOOD_TXT[v]; ui.mood = v; ui.mtxt = pool[Math.floor(Math.random() * pool.length)]; save(); render(); speak(ui.mtxt);
+}
+function closest() {
+  return S.people.filter(function (p) { return (p.circle === 'famille_proche' || p.circle === 'amis_proches') && (personTel(p) || waNum(p)); }).sort(function (a, b) { return (a.last || '') < (b.last || '') ? 1 : -1; })[0] || S.people.filter(function (p) { return personTel(p) || waNum(p); })[0] || null;
+}
+function V_mood() {
+  var v = ui.mood || 0, h = '<div class="screen">' + head('Comment allez-vous ?');
+  if (ui.heard) h += '<p class="small muted">Vous avez dit : « ' + esc(ui.heard) + ' »</p>';
+  h += '<p class="muted">' + (S.settings.name ? esc(S.settings.name.split(' ')[0]) + ', comment' : 'Comment') + ' vous sentez-vous en ce moment ?</p>';
+  h += '<div class="moodb" role="group" aria-label="Humeur">' + [[3, '😊', 'Bien'], [2, '😐', 'Moyen'], [1, '😔', 'Pas top']].map(function (x) { return '<button type="button" aria-pressed="' + (v === x[0]) + '" data-act="mood" data-v="' + x[0] + '"><span class="e" aria-hidden="true">' + x[1] + '</span>' + x[2] + '</button>'; }).join('') + '</div>';
+  if (v) {
+    h += '<section class="story"><div class="row between"><div class="eyebrow">Best Support</div><button type="button" class="iconbtn" data-act="speakMood" aria-label="Réécouter">' + ic('speaker') + '</button></div><p>' + esc(ui.mtxt) + '</p></section>';
+    var c = closest(), pr = priorities().list[0];
+    if (v === 1) {
+      h += '<section class="card" style="align-items:center;text-align:center"><div class="eyebrow">Respirer une minute</div><div class="breath">Respirez</div><p class="small muted">Inspirez quand le cercle grandit, gardez l\'air un instant, soufflez doucement quand il diminue.</p></section>';
+      if (c) h += '<section class="card"><h2 class="h2">Parler à quelqu\'un qui vous fait du bien</h2><p class="small muted">Un appel de quelques minutes avec ' + esc(c.name) + ' peut alléger la soirée.</p><div class="grid2">' + (personTel(c) ? '<a class="btn btn-green" href="' + esc(telLink(personTel(c))) + '">' + ic('phone', 18) + ' Appeler</a>' : '') + (waNum(c) ? '<a class="btn btn-ghost" href="' + esc(waLink(waNum(c), 'Coucou ' + c.name + ', tu as un moment pour parler ?')) + '" target="_blank" rel="noopener">' + ic('chat', 18) + ' Écrire</a>' : '') + '</div></section>';
+      var lows = (S.moods || []).filter(function (m) { return diff(m.date, today()) <= 6 && m.v === 1; }).length;
+      if (lows >= 3) h += '<div class="note">' + ic('heart', 18) + '<span>Plusieurs soirs difficiles cette semaine. Si ce poids dure, en parler à une personne de confiance ou à un professionnel de santé peut vraiment aider. Vous méritez ce soutien.</span></div>';
+    } else if (v === 2 && pr) h += '<div class="note">' + ic('info', 18) + '<span>Demain, une seule priorité : ' + esc(pr.title) + '. Le reste peut attendre.</span></div>';
+    else if (v === 3 && c && waNum(c)) h += '<a class="btn btn-ghost btn-block" href="' + esc(waLink(waNum(c), 'Coucou ' + c.name + ' ! Je pensais à toi, belle soirée 🙂')) + '" target="_blank" rel="noopener">' + ic('chat', 18) + ' Un petit mot à ' + esc(c.name) + '</a>';
+  }
+  return h + '</div>';
+}
+var CHEERS = ['Bravo, une chose de moins à porter.', 'Bien joué !', 'C\'est fait, et bien fait.', 'Vous avancez, c\'est ce qui compte.', 'Une de plus. Bravo !', 'Vos proches comptent sur vous, et vous assurez.'];
+function cheer() { return CHEERS[Math.floor(Math.random() * CHEERS.length)]; }
+
+function startVoice(presetPid) { openListen(presetPid); }
+function startVoiceOnce(presetPid) {
   var done = function (text) {
     if (!text) { toast("Je n'ai rien entendu. Réessayez."); return; }
     if (!presetPid && voiceCommand(text)) return;
@@ -2492,6 +2681,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '1.0 bêta', items: ['Touchez et parlez : dites ce que vous avez en tête, aussi longtemps que vous voulez. Best Support enregistre directement vos tâches et rendez-vous, sans formulaire', 'Plusieurs choses d\'un coup : « Cale un rendez-vous demain pour Maman à 15 h, et puis rappelle-moi d\'acheter du pain »', 'Rappels plus insistants : 30 min avant, à l\'heure exacte, relances tant que ce n\'est pas fait (réglable)', 'Le soir, Best Support prend de vos nouvelles et vous répond avec bienveillance', 'Encouragements quand vous terminez une tâche'] },
   { v: '0.9.3 bêta', items: ['Le bandeau « Nouvelle version » disparaît dès que la mise à jour est installée, et affiche toujours la dernière version'] },
   { v: '0.9.2 bêta', items: ['Correction : l\'installation était bloquée par la sécurité de certains téléphones'] },
   { v: '0.9 bêta', items: ['Notifications plus utiles : « C\'est fait », « Demain » et « Appeler » directement', 'Point du matin : touchez « Écouter » pour l\'entendre', 'Relances polies sur WhatsApp, au tutoiement ou au vouvoiement selon la personne, et rappel de cotisation pour le groupe', 'Parlez à Best Support : « Qu\'est-ce que je dois faire cette semaine ? », « La dette de Koffi est payée »', 'Anniversaires : alerte 3 jours avant pour vos proches, avec le souvenir du dernier don', 'Vœux prêts pour Noël, le Nouvel An, Pâques, Tabaski et Korité', 'Widget : vos 3 priorités et un bouton micro', 'Bilan sur 7 ou 30 jours, et rappel mensuel de ceux qui attendent de vos nouvelles'] },
@@ -2549,7 +2739,7 @@ function V_lock() {
     (N && S.settings.lock === 'bio' ? '<button type="button" class="btn btn-ghost btn-block" data-act="bio">Utiliser l\'empreinte</button>' : '') + '</form></div>';
 }
 
-var VIEWS = { fete: V_fete, vanswer: V_vanswer, vconfirm: V_vconfirm, audio: V_audio, afterCall: V_afterCall, cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
+var VIEWS = { vdone: V_vdone, mood: V_mood, fete: V_fete, vanswer: V_vanswer, vconfirm: V_vconfirm, audio: V_audio, afterCall: V_afterCall, cotis: V_cotis, coti: V_coti, cotiForm: V_cotiForm, join: V_join, search: V_search, report: V_report, news: V_news, survey: V_survey, calendars: V_calendars, messages: V_messages, gifts: V_gifts, giftForm: V_giftForm, tontines: V_tontines, tontine: V_tontine, tontineForm: V_tontineForm, importContacts: V_importContacts, splash: V_splash, onb: V_onb, home: V_home, people: V_people, person: V_person, agenda: V_agenda, item: V_item, itemForm: V_itemForm, personForm: V_personForm, plus: V_plus, bilan: V_bilan, routines: V_routines, routine: V_routine, about: V_about, settings: V_settings };
 function navHtml() {
   var cur = TAB_OF[view.name] || '';
   var b = function (id, icon, label) { return '<button type="button" data-act="tab" data-to="' + id + '"' + (cur === id ? ' aria-current="page"' : '') + '>' + ic(icon, 22) + label + '</button>'; };
@@ -2611,7 +2801,7 @@ var ACT = {
   setF: function (d) { F[d.k] = d.k === 'fstars' ? Number(d.v) : d.v; render(); },
   setFbool: function (d) { F[d.field] = F[d.field] === false; render(); },
   openEntry: function (d) { openKey(d.key); },
-  doneEntry: function (d) { var snap = snapshot(), msg = doDone(d.key); save(); render(); toast(msg, snap); },
+  doneEntry: function (d) { var snap = snapshot(), msg = doDone(d.key); save(); render(); toast(msg + ' ' + cheer(), snap); },
   snooze: function (d) {
     var t = today(), until = d.d === 'we' ? nextRoutineDate({ day: 6 }, addDays(t, 1)) : addDays(t, Number(d.d));
     var snap = snapshot(); S.snooze[d.key] = until; save(); ui = {}; render(); toast('Reporté au ' + fmtDM(until) + '.', snap);
@@ -2665,6 +2855,10 @@ var ACT = {
   feteSent: function (d, el) { try { window.open(el.getAttribute('href'), '_blank'); } catch (e) { } var k = 'fete:' + d.k + ':' + today().slice(0, 4); S.checks[k] = S.checks[k] || []; if (S.checks[k].indexOf(d.id) < 0) S.checks[k].push(d.id); var pp = person(d.id); if (pp) markContact(pp); save(); setTimeout(render, 600); return 'keep'; },
   waAllow: function () { if (!N || !N.CallNotes) return; toast('Dans la liste, activez « Best Support », puis revenez ici.'); setTimeout(function () { N.CallNotes.openWaAccess().catch(function () { }); }, 600); },
   waHide: function () { lsSet('bs-wa-hide', '1'); render(); },
+  vdUndo: function (d) { S.items = S.items.filter(function (x) { return x.id !== d.id; }); LAST_ADDED = LAST_ADDED.filter(function (x) { return x !== d.id; }); save(); if (!LAST_ADDED.length) tab('home'); else render(); toast('Annulé.'); },
+  mood: function (d) { setMood(Number(d.v)); },
+  speakMood: function () { if (ui.mtxt) speak(ui.mtxt); },
+  setInsist: function (d) { S.settings.insist = d.v; save(); render(); },
   setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
   voiceFor: function (d) { startVoice(d.pid || ''); },
   nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
