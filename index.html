@@ -253,7 +253,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '1.3 bêta';
+var VERSION = '1.3.1 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -856,7 +856,7 @@ function buildSchedule(since) {
     if (restOf(iso(date)) && !urgent) return;
     if (pu && date.getTime() < pu) { held.push(title); return; }
     if (inQuiet(date) && !/^(at|pre|bd):/.test(key)) return;
-    var n = { id: hashId(key), title: title, body: body, largeBody: body, schedule: { at: date, allowWhileIdle: true }, channelId: 'rappels', extra: { key: entryKey || '' } };
+    var n = { id: hashId(key), title: title, body: body, largeBody: body, schedule: { at: date, allowWhileIdle: true }, channelId: /^(ck|mo|m):/.test(key) ? 'rappels' : 'alertes', extra: { key: entryKey || '' } };
     if (type) n.actionTypeId = type;
     if (/^at:/.test(key)) { n.ongoing = true; n.autoCancel = false; }
     else if (entryKey) n.actionTypeId = keyTel(entryKey) ? 'bs-entry-call' : 'bs-entry';
@@ -912,7 +912,7 @@ function buildSchedule(since) {
     if (S.settings.weekly !== false && d.slice(8) === '01') add('mo:' + d, atTime(d, mh, 45), 'Votre mois avec vos proches', 'Qui vous avez vu, qui attend de vos nouvelles : votre bilan du mois est prêt.', 'b:mois', false, 'bs-plain');
     if (S.settings.weekly !== false && parse(d).getDay() === 1) add('w:' + d, atTime(d, mh, 30), 'Votre bilan de la semaine est prêt', 'Voyez qui attend de vos nouvelles et ce qui arrive cette semaine.', null, false);
   }
-  if (pu && pu > now.getTime() && held.length) out.push({ id: hashId('pause:' + pu), title: 'Fin de la pause : ' + plural(held.length, 'rappel') + ' en attente', body: held.slice(0, 4).join(' · '), largeBody: held.slice(0, 8).join(' · '), schedule: { at: new Date(pu + 30000), allowWhileIdle: true }, channelId: 'rappels', extra: { key: '' } });
+  if (pu && pu > now.getTime() && held.length) out.push({ id: hashId('pause:' + pu), title: 'Fin de la pause : ' + plural(held.length, 'rappel') + ' en attente', body: held.slice(0, 4).join(' · '), largeBody: held.slice(0, 8).join(' · '), schedule: { at: new Date(pu + 30000), allowWhileIdle: true }, channelId: 'alertes', extra: { key: '' } });
   return out.sort(function (a, b) { return a.schedule.at - b.schedule.at; }).slice(0, 300);
 }
 function scheduleNative() {
@@ -955,6 +955,7 @@ function initNative() {
   if (!N) return;
   var LN = N.LocalNotifications;
   try { LN.createChannel({ id: 'rappels', name: 'Rappels', description: 'Rappels de Best Support', importance: 4, visibility: 1, vibration: true }); } catch (e) { }
+  try { LN.createChannel({ id: 'alertes', name: 'Alertes à l\'écran', description: 'Rappels importants affichés en haut de l\'écran, avec son et vibration', importance: 5, visibility: 1, vibration: true, lights: true, lightColor: '#E36A00' }); } catch (e) { }
   try { LN.registerActionTypes({ types: NOTIF_TYPES }); } catch (e) { }
   LN.addListener('localNotificationActionPerformed', function (ev) { onNotifAction(ev.actionId, ev.notification && ev.notification.extra && ev.notification.extra.key); });
   LN.checkPermissions().then(function (p) { nativePerm = p.display; render(); scheduleNative(); }).catch(function () { });
@@ -1643,6 +1644,7 @@ function V_settings() {
   var vl = VOICE_LIST || [], cur = pickVoice(vl), hasQ = vl.some(function (v) { return v.q >= 50; });
   h += '<section class="card"><h2 class="h2">Assistant intelligent</h2><p class="small muted">Comprend vos phrases comme une vraie personne (dates, heures, noms, ce qui est important) et écoute directement vos enregistrements d\'appels pour en tirer les tâches. Nécessite internet et la connexion Google. Le texte ou l\'audio est envoyé de façon chiffrée à un service d\'intelligence artificielle pour l\'analyse, puis n\'est pas conservé par Best Support. Sans internet, la compréhension simple prend le relais.</p>' +
     switchRow('Utiliser l\'assistant intelligent', !!S.settings.ai, 'aiToggle', '', 'ai') + (S.settings.ai && !sbUser ? '<p class="tiny" style="color:var(--orange-ink)">Connectez-vous avec Google pour l\'activer.</p>' : '') + '</section>';
+  if (N) h += '<section class="card"><h2 class="h2">Notifications à l\'écran</h2><p class="small muted">Les rappels importants s\'affichent en haut de l\'écran, avec son et vibration. Si vous ne voyez pas de pop-up, ouvrez les réglages et activez « Afficher en pop-up » (Samsung) ou « Afficher à l\'écran ».</p><div class="grid2"><button type="button" class="btn btn-ghost" data-act="testNotif">' + ic('bell', 18) + ' Tester</button><button type="button" class="btn btn-ghost" data-act="notifSettings">' + ic('gear', 18) + ' Réglages</button></div></section>';
   h += '<section class="card"><h2 class="h2">Insistance des rappels</h2><p class="small muted">' + ({ douce: 'Douce : la veille au soir et le matin même.', normale: 'Normale : en plus, ' + (S.settings.lead || 30) + ' min avant et à l\'heure exacte.', forte: 'Forte : en plus, relances à 13 h et 18 h 30 tant que ce n\'est pas fait, et les jours suivants si c\'est en retard.' })[S.settings.insist || 'forte'] + '</p><div class="seg" style="grid-template-columns:repeat(3,minmax(0,1fr))" role="group" aria-label="Insistance">' + [['douce', 'Douce'], ['normale', 'Normale'], ['forte', 'Forte']].map(function (x) { return '<button type="button" aria-pressed="' + ((S.settings.insist || 'forte') === x[0]) + '" data-act="setInsist" data-v="' + x[0] + '">' + x[1] + '</button>'; }).join('') + '</div>' +
     switchRow('Me demander comment je vais, le soir à ' + (S.settings.checkinHour || 21) + ' h', S.settings.checkin !== false, 'setToggle', '', 'checkin') + '</section>';
   h += '<section class="card"><h2 class="h2">Lecture à voix haute</h2><p class="small muted">Best Support choisit la meilleure voix française de votre appareil. Vous pouvez en essayer d\'autres.</p>' +
@@ -2997,6 +2999,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '1.3.1 bêta', items: ['Rappels affichés en pop-up en haut de l\'écran, avec son et vibration', 'Paramètres : bouton « Tester » et accès direct aux réglages de notification'] },
   { v: '1.3 bêta', items: ['Le soir : le récap de votre journée (fait, reste, demain) à lire ou écouter, puis « Comment vous sentez-vous ? »', 'Après des funérailles, une visite à l\'hôpital, une naissance ou un examen : « Prendre des nouvelles » s\'ajoute tout seul quelques jours après', 'Ne pas déranger (cloche en haut de l\'accueil) : pause d\'1 h, 2 h, jusqu\'à ce soir, puis un seul résumé. Nuit calme de 22 h à 6 h 30', 'Famille : confiez une tâche à un proche, elle apparaît chez lui avec ses rappels', 'Point argent : chaque semaine, ce qu\'on vous doit, ce que vous devez, tontines et cotisations'] },
   { v: '1.2 bêta', items: ['Appel manqué d\'un proche : notification avec « Rappeler », et la tâche « Rappeler X » passe en tête de vos priorités', 'À l\'heure d\'un rendez-vous, la notification reste affichée tant que vous n\'avez pas touché « C\'est fait » ou « Demain »'] },
   { v: '1.1 bêta', items: ['Assistant intelligent (option) : il comprend vos phrases comme une vraie personne et classe tout seul par priorité', 'Après un appel : « Analyser l\'enregistrement de cet appel » ouvre directement vos enregistrements d\'appels', 'Dites « urgent » ou « important » : la tâche passe en tête', '« En journée » et « tout à l\'heure » sont compris comme aujourd\'hui'] },
@@ -3190,6 +3193,8 @@ var ACT = {
   unpause: function () { setPause(0, ''); },
   famDone: function (d) { var f = fam(d.id), t = f && f.tasks.filter(function (x) { return x.id === d.t; })[0]; if (!t) return; t.done = !t.done; t.doneBy = t.done ? (S.settings.name || '') : ''; t.at = Date.now(); save(); syncSoon(); render(); if (t.done) toast('Fait. ' + cheer()); },
   famDel: function (d) { var f = fam(d.id), t = f && f.tasks.filter(function (x) { return x.id === d.t; })[0]; if (!t) return; t.del = true; t.at = Date.now(); save(); syncSoon(); render(); toast('Tâche retirée.'); },
+  testNotif: function () { if (!N) return; N.LocalNotifications.schedule({ notifications: [{ id: 990001, title: 'Test : Best Support', body: 'Si ce message s\'affiche en haut de l\'écran, tout est bon.', schedule: { at: new Date(Date.now() + 5000), allowWhileIdle: true }, channelId: 'alertes', actionTypeId: 'bs-plain', extra: { key: '' } }] }).then(function () { toast('Notification de test dans 5 secondes. Verrouillez ou quittez l\'app pour bien la voir.'); }).catch(function (e) { toast('Test impossible. (' + errMsg(e) + ')'); }); },
+  notifSettings: function () { if (N && N.CallNotes && N.CallNotes.openNotifSettings) N.CallNotes.openNotifSettings({ channel: 'alertes' }).catch(function () { N.CallNotes.openNotifSettings({}); }); },
   setAsr: function (d) { S.settings.asrModel = d.v; save(); render(); },
   voiceFor: function (d) { startVoice(d.pid || ''); },
   nothingToNote: function (d) { var pp = d.pid ? person(d.pid) : null; if (pp) { markContact(pp); save(); } tab('home'); toast(pp ? 'Contact noté avec ' + pp.name + '.' : 'Très bien.'); },
