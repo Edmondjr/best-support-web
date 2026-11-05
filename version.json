@@ -1,6 +1,6 @@
 {
-  "build": 21,
-  "version": "1.1 bêta",
+  "build": 22,
+  "version": "1.2 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "Analyse de l'enregistrement d'appel et assistant intelligent."
+  "notes": "Appels manqués de vos proches et rappels qui restent affichés."
 }

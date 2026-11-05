@@ -253,7 +253,7 @@ nav.tabs button.fab{justify-self:center;width:58px;height:58px;border-radius:29p
 document.documentElement.lang = 'fr';
 
 /* ---------- Constantes ---------- */
-var VERSION = '1.1 bêta';
+var VERSION = '1.2 bêta';
 var SB_URL = 'https://xharmnblourepplhzmaf.supabase.co';
 var SB_KEY = 'sb_publishable_SW6FWKpPXTBnQ62HRLr92Q_6B9Loij_';
 var BUILD = Number(window.BS_BUILD || 0);
@@ -736,6 +736,7 @@ function buildSchedule(since) {
     if (restOf(iso(date)) && !urgent) return;
     var n = { id: hashId(key), title: title, body: body, largeBody: body, schedule: { at: date, allowWhileIdle: true }, channelId: 'rappels', extra: { key: entryKey || '' } };
     if (type) n.actionTypeId = type;
+    if (/^at:/.test(key)) { n.ongoing = true; n.autoCancel = false; }
     else if (entryKey) n.actionTypeId = keyTel(entryKey) ? 'bs-entry-call' : 'bs-entry';
     out.push(n);
   };
@@ -809,6 +810,7 @@ function onNotifAction(actionId, key) {
     if (actionId === 'msg' && key) { var pm = person(key.split(':')[1]); if (pm) { F = {}; go('messages', { id: pm.id }); ui.occ = 'anniv'; render(); return; } }
     if (actionId === 'listen') { tab('home'); setTimeout(function () { speak(briefText()); }, 400); return; }
     if (key === 'm:') { tab('home'); return; }
+    if ((actionId === 'done' || actionId === 'later') && key) clearDelivered(key);
     if (actionId === 'done' && key) { doDone(key); save(); render(); toast("C'est noté. " + cheer()); return; }
     if (/^mood_/.test(actionId || '')) { openMood(Number(actionId.slice(5))); return; }
     if (key === 'mood:') { openMood(0); return; }
@@ -827,10 +829,10 @@ function initNative() {
   N.App.addListener('appStateChange', function (st) {
     if (!st.isActive) { hiddenAt = Date.now(); return; }
     if (lockOn() && Date.now() - hiddenAt > 60000) locked = true;
-    syncCalls(); syncWaCalls(); checkWa(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); handleShared(); render();
+    syncCalls(); syncWaCalls(); syncMissed(); checkWa(); syncCalendar(false); checkUpdate(false); scheduleNative(); updateWidget(); flushOutbox(); syncNow(false); handleShared(); render();
   });
   N.App.addListener('backButton', function () { if (locked) { N.App.minimizeApp(); return; } if (stack.length) { F = {}; back(); } else if (view.name !== 'home' && S.settings.onboarded) tab('home'); else N.App.minimizeApp(); });
-  syncCalls(); syncWaCalls(); checkWa();
+  syncCalls(); syncWaCalls(); syncMissed(); checkWa();
 }
 function checkExact() {
   if (!N || !N.LocalNotifications.checkExactNotificationSetting) return;
@@ -845,6 +847,26 @@ function checkWa() {
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
+function syncMissed(openPid) {
+  if (!N || !N.CallNotes) return;
+  N.CallNotes.consumeMissed().then(function (r) {
+    var n = 0;
+    (r && r.calls || []).forEach(function (c) {
+      var p = person(c.id); if (!p) return;
+      var at = new Date(Number(c.at) || Date.now()), hm = pad(at.getHours()) + ':' + pad(at.getMinutes());
+      var ex = S.items.filter(function (i) { return !i.done && i.personId === p.id && /^Rappeler /.test(i.title); })[0];
+      if (ex) { ex.notes = (ex.notes ? ex.notes + '\n' : '') + 'Appel manqué à ' + hm; ex.due = today(); ex.imp = 'haute'; }
+      else S.items.push({ id: uid(), type: 'engagement', title: 'Rappeler ' + p.name, personId: p.id, amount: '', dir: 'je_dois', due: today(), time: '', place: '', notes: 'Appel manqué à ' + hm, checklist: [], remindEve: false, remindDay: true, recur: '', imp: 'haute', done: false, created: today() });
+      n++;
+    });
+    if (n) { save(); render(); }
+    if (openPid && person(openPid)) { F = {}; stack = [{ name: 'home', p: {} }]; view = { name: 'person', p: { id: openPid } }; ui = {}; render(); }
+  }).catch(function () { });
+}
+function clearDelivered(key) {
+  if (!N || !key) return;
+  try { N.LocalNotifications.getDeliveredNotifications().then(function (r) { var ids = (r && r.notifications || []).filter(function (n) { return n.extra && n.extra.key === key; }).map(function (n) { return { id: n.id }; }); if (ids.length) N.LocalNotifications.removeDeliveredNotifications({ notifications: ids }); }).catch(function () { }); } catch (e) { }
+}
 function syncWaCalls() {
   if (!WA_SUPPORTED || !N || !N.CallNotes) return;
   N.CallNotes.consumeWaCalls().then(function (r) {
@@ -2689,6 +2711,7 @@ function initSync() {
     render();
   });
   if (N && N.App) N.App.addListener('appUrlOpen', function (ev) {
+    if (ev && ev.url && ev.url.indexOf('://missed') >= 0) { var mq = {}; (ev.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) mq[a[0]] = decodeURIComponent(a[1] || ''); }); syncMissed(mq.pid); return; }
     if (ev && ev.url && ev.url.indexOf('://voice') >= 0) { F = {}; stack = []; view = { name: 'home', p: {} }; render(); setTimeout(function () { startVoice(); }, 350); return; }
     if (ev && ev.url && ev.url.indexOf('after-call') >= 0) {
       var q = {}; (ev.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); });
@@ -2785,6 +2808,7 @@ function V_report(p0) {
 
 /* Nouveautés et questionnaire */
 var NEWS = [
+  { v: '1.2 bêta', items: ['Appel manqué d\'un proche : notification avec « Rappeler », et la tâche « Rappeler X » passe en tête de vos priorités', 'À l\'heure d\'un rendez-vous, la notification reste affichée tant que vous n\'avez pas touché « C\'est fait » ou « Demain »'] },
   { v: '1.1 bêta', items: ['Assistant intelligent (option) : il comprend vos phrases comme une vraie personne et classe tout seul par priorité', 'Après un appel : « Analyser l\'enregistrement de cet appel » ouvre directement vos enregistrements d\'appels', 'Dites « urgent » ou « important » : la tâche passe en tête', '« En journée » et « tout à l\'heure » sont compris comme aujourd\'hui'] },
   { v: '1.0.1 bêta', items: ['Sur ordinateur aussi : touchez et parlez (ou touche M), rappels insistants, prise de nouvelles le soir, boutons dans les notifications'] },
   { v: '1.0 bêta', items: ['Touchez et parlez : dites ce que vous avez en tête, aussi longtemps que vous voulez. Best Support enregistre directement vos tâches et rendez-vous, sans formulaire', 'Plusieurs choses d\'un coup : « Cale un rendez-vous demain pour Maman à 15 h, et puis rappelle-moi d\'acheter du pain »', 'Rappels plus insistants : 30 min avant, à l\'heure exacte, relances tant que ce n\'est pas fait (réglable)', 'Le soir, Best Support prend de vos nouvelles et vous répond avec bienveillance', 'Encouragements quand vous terminez une tâche'] },
@@ -3236,7 +3260,7 @@ try { if (localStorage.getItem('bs-v081') !== '1') { localStorage.setItem('bs-v0
 if (N) {
   window.addEventListener('bsShared', handleShared);
   handleShared();
-  if (N.App.getLaunchUrl) N.App.getLaunchUrl().then(function (r) { if (r && r.url && r.url.indexOf('://voice') >= 0) { setTimeout(function () { startVoice(); }, 600); return; } if (r && r.url && r.url.indexOf('after-call') >= 0) { var q = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); }); stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: q }; render(); } }).catch(function () { });
+  if (N.App.getLaunchUrl) N.App.getLaunchUrl().then(function (r) { if (r && r.url && r.url.indexOf('://missed') >= 0) { var mq = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) mq[a[0]] = decodeURIComponent(a[1] || ''); }); syncMissed(mq.pid); return; } if (r && r.url && r.url.indexOf('://voice') >= 0) { setTimeout(function () { startVoice(); }, 600); return; } if (r && r.url && r.url.indexOf('after-call') >= 0) { var q = {}; (r.url.split('?')[1] || '').split('&').forEach(function (kv) { var a = kv.split('='); if (a[0]) q[a[0]] = decodeURIComponent((a[1] || '').replace(/\+/g, ' ')); }); stack = [{ name: 'home', p: {} }]; view = { name: 'afterCall', p: q }; render(); } }).catch(function () { });
 }
 setInterval(function () { if (sbUser && !document.hidden) syncNow(false); }, 120000);
 if (N) { syncCalendar(false); checkUpdate(false); updateWidget(); }
