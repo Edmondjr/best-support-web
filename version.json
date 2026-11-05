@@ -1,6 +1,6 @@
 {
-  "build": 20,
-  "version": "1.0.1 bêta",
+  "build": 21,
+  "version": "1.1 bêta",
   "apk": "https://bestsupport.mrdnej.com/downloads/BestSupport.apk",
-  "notes": "L'assistant arrive aussi sur ordinateur."
+  "notes": "Analyse de l'enregistrement d'appel et assistant intelligent."
 }
